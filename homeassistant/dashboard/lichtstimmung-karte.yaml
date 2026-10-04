@@ -8,6 +8,15 @@ cards:
     features:
       - type: select-options
 
+  # Welche Kombination gerade leuchtet, z. B. „Buch Nr. 236“
+  - type: entities
+    entities:
+      - type: attribute
+        entity: sensor.lichtstimmung_zustand
+        attribute: quelle
+        name: Kombination
+        icon: mdi:book-open-variant
+
   - type: grid
     columns: 3
     square: false

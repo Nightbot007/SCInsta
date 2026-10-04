@@ -10,6 +10,7 @@ from homeassistant.util.yaml import load_yaml
 
 REPO = Path(__file__).parent.parent
 JINJA = REPO / "homeassistant" / "custom_templates" / "lichtstimmung.jinja"
+JINJA_BUCH = REPO / "homeassistant" / "custom_templates" / "lichtstimmung_buch.jinja"
 PACKAGE = REPO / "homeassistant" / "packages" / "lichtstimmung.yaml"
 
 LAMPEN = [
@@ -49,6 +50,9 @@ async def richte_ein(hass, config_dir, lampen=LAMPEN, jinja_anpassen=None):
     if jinja_anpassen:
         jinja = jinja_anpassen(jinja)
     (config_dir / "custom_templates" / "lichtstimmung.jinja").write_text(jinja, encoding="utf-8")
+    (config_dir / "custom_templates" / "lichtstimmung_buch.jinja").write_text(
+        JINJA_BUCH.read_text(encoding="utf-8"), encoding="utf-8"
+    )
     await async_load_custom_templates(hass)
 
     for domain in ("homeassistant", "persistent_notification", "scene"):

@@ -2,6 +2,7 @@
   LICHTSTIMMUNG – Lampen, Modi und Farblogik
 
   Ablage in Home Assistant:  /config/custom_templates/lichtstimmung.jinja
+                             (+ lichtstimmung_buch.jinja im selben Ordner)
   Nach jeder Änderung:       Skript „Lichtstimmung – Konfiguration neu laden“
                              ausführen (oder Home Assistant neu starten).
 
@@ -31,91 +32,143 @@
 
 {#- -------------------------------------------------------------------------
   2) MODI
-  farben      Palette als [Farbton 0–360, Sättigung 0–100].
-              Farbton: 0 Rot · 30 Orange · 60 Gelb · 120 Grün · 180 Cyan
-                       220 Blau · 270 Violett · 300 Magenta · 330 Pink
-              Reihenfolge = Farbverlauf durch den Raum. Mindestens 3 Farben,
-              damit nie alle Lampen gleich aussehen.
-  hell        Helligkeit in % je Lampentyp, 0 = Lampe bleibt aus.
-              'standard' gilt für alle Typen ohne eigenen Eintrag.
-  kelvin      Farbtemperatur für Lampen, die nur Weiß können.
-  streuung    Zufällige Abweichung des Farbtons in Grad (±). Dadurch sieht
-              jede Aktivierung etwas anders aus – Lieblingsvarianten kann man
-              als Favorit speichern.
-  uebergang   Überblendzeit in Sekunden.
-  typ_farben  (optional) eigene Palette für einen Lampentyp,
-              z. B. die Nachttischlampe immer warm.
-  effekt      (optional) 'blitze' = gelegentliche Blitze (Gewitter).
-  aktiv       false = Modus ist vorbereitet, aber nicht in der Auswahl.
+  Bei jedem Einschalten (und bei „Neu würfeln“) wählt ein Modus eine
+  Farbkombination – aus dem Buch oder aus deinen eigenen Paletten.
 
-  Neuer Modus: Block kopieren, Namen ändern, Farben anpassen, fertig.
+  buch           Nummern aus „A Dictionary of Color Combinations“ (配色事典)
+                 von Sanzo Wada. Die Nummer steht im Buch bei jeder
+                 Kombination (1–120: 2 Farben, 121–240: 3, 241–348: 4).
+                 'alle' = das ganze Buch. Welche Kombination gerade leuchtet,
+                 steht im Attribut „quelle“ von sensor.lichtstimmung_zustand.
+  eigene         Eigene Paletten: eine Liste von Paletten, jede Palette eine
+                 Liste von [Farbton 0–360, Sättigung 0–100].
+                 Farbton: 0 Rot · 30 Orange · 60 Gelb · 120 Grün · 180 Cyan
+                          220 Blau · 270 Violett · 300 Magenta · 330 Pink
+                 Reihenfolge = Farbverlauf durch den Raum.
+  eigene_anteil  Wie oft (in %) eine eigene Palette statt einer Buch-
+                 Kombination drankommt, wenn es beides gibt. Standard 30.
+  hell           Helligkeit in % je Lampentyp, 0 = Lampe bleibt aus.
+                 'standard' gilt für alle Typen ohne eigenen Eintrag.
+                 Dunkle Buchfarben leuchten automatisch gedämpfter.
+  kelvin         Farbtemperatur für Lampen, die nur Weiß können.
+  streuung       Zufällige Abweichung des Farbtons in Grad (±). Dadurch sieht
+                 jede Aktivierung etwas anders aus – Lieblingsvarianten kann
+                 man als Favorit speichern.
+  uebergang      Überblendzeit in Sekunden.
+  typ_farben     (optional) eigene Palette für einen Lampentyp,
+                 z. B. die Nachttischlampe immer warm.
+  effekt         (optional) 'blitze' = gelegentliche Blitze (Gewitter).
+  aktiv          false = Modus ist vorbereitet, aber nicht in der Auswahl.
+
+  Die Buch-Nummern unten sind passend zur Stimmung vorsortiert
+  (tools/buch_importieren.py --vorschlaege). Nummern ergänzen oder
+  streichen ist ausdrücklich erwünscht.
 ------------------------------------------------------------------------- -#}
 {%- set MODI = {
   'Cozy': {
     'aktiv': true,
-    'farben': [[38, 70], [30, 88], [22, 92], [12, 80], [45, 60]],
+    'buch': [3, 10, 14, 31, 35, 71, 91, 97, 102, 104, 108, 113, 115, 120, 165,
+             185, 190, 195, 206, 222, 228, 246, 275, 288, 292, 296],
+    'eigene': [
+      [[38, 70], [30, 88], [22, 92], [12, 80], [45, 60]],
+    ],
     'hell': {'standard': 45, 'decke': 20, 'steh': 60, 'streifen': 40, 'nacht': 35},
     'kelvin': 2200,
-    'streuung': 5,
+    'streuung': 4,
     'uebergang': 2,
   },
   'Cyberpunk': {
     'aktiv': true,
-    'farben': [[325, 100], [300, 100], [275, 100], [230, 100], [190, 100]],
+    'buch': [48, 64, 128, 187, 225, 314, 324],
+    'eigene': [
+      [[325, 100], [300, 100], [275, 100], [230, 100], [190, 100]],
+      [[310, 100], [190, 100], [280, 95], [205, 100]],
+    ],
+    'eigene_anteil': 50,
     'hell': {'standard': 60, 'decke': 25, 'steh': 70, 'streifen': 85, 'nacht': 45},
     'kelvin': 6500,
-    'streuung': 8,
+    'streuung': 6,
     'uebergang': 1,
   },
   'Ruhig': {
     'aktiv': true,
-    'farben': [[200, 45], [220, 40], [250, 35], [175, 35]],
+    'buch': [20, 72, 105, 176, 202, 223],
+    'eigene': [
+      [[200, 45], [220, 40], [250, 35], [175, 35]],
+    ],
     'typ_farben': {'nacht': [[32, 55], [26, 60]]},
     'hell': {'standard': 30, 'decke': 10, 'steh': 35, 'streifen': 20, 'nacht': 25},
     'kelvin': 2700,
-    'streuung': 4,
+    'streuung': 3,
     'uebergang': 4,
   },
   'Regen / Gewitter': {
     'aktiv': true,
-    'farben': [[215, 90], [228, 85], [245, 80], [200, 70], [260, 70]],
+    'buch': [15, 44, 49, 54, 75, 106, 119, 139, 218],
+    'eigene': [
+      [[215, 90], [228, 85], [245, 80], [200, 70], [260, 70]],
+    ],
     'hell': {'standard': 30, 'decke': 0, 'steh': 35, 'streifen': 40, 'nacht': 20},
     'kelvin': 5000,
-    'streuung': 6,
+    'streuung': 4,
     'uebergang': 3,
     'effekt': 'blitze',
+  },
+  'Farbwörterbuch': {
+    'aktiv': true,
+    'buch': 'alle',
+    'hell': {'standard': 50, 'decke': 25, 'steh': 60, 'streifen': 55, 'nacht': 35},
+    'kelvin': 3000,
+    'streuung': 2,
+    'uebergang': 2,
   },
 
   'Sonnenuntergang': {
     'aktiv': false,
-    'farben': [[350, 85], [10, 90], [25, 95], [40, 85], [300, 55]],
+    'buch': [13, 24, 53, 71, 91, 103, 108, 144, 170, 220, 238, 269, 273, 275,
+             288, 315, 327, 329],
+    'eigene': [
+      [[350, 85], [10, 90], [25, 95], [40, 85], [300, 55]],
+    ],
     'hell': {'standard': 50, 'decke': 20, 'streifen': 60, 'nacht': 35},
     'kelvin': 2300,
-    'streuung': 6,
+    'streuung': 5,
     'uebergang': 3,
   },
   'Nordlicht': {
     'aktiv': false,
-    'farben': [[150, 90], [165, 85], [180, 70], [280, 65], [130, 75]],
+    'buch': [15],
+    'eigene': [
+      [[150, 90], [165, 85], [180, 70], [280, 65], [130, 75]],
+    ],
+    'eigene_anteil': 70,
     'hell': {'standard': 45, 'decke': 15, 'streifen': 60, 'nacht': 30},
     'kelvin': 5500,
-    'streuung': 8,
+    'streuung': 6,
     'uebergang': 3,
   },
   'Ozean': {
     'aktiv': false,
-    'farben': [[190, 90], [205, 85], [175, 80], [220, 75], [160, 60]],
+    'buch': [44, 54, 74],
+    'eigene': [
+      [[190, 90], [205, 85], [175, 80], [220, 75], [160, 60]],
+    ],
+    'eigene_anteil': 50,
     'hell': {'standard': 45, 'decke': 20, 'streifen': 55, 'nacht': 30},
     'kelvin': 6000,
-    'streuung': 6,
+    'streuung': 5,
     'uebergang': 3,
   },
   'Wald': {
     'aktiv': false,
-    'farben': [[95, 70], [120, 65], [140, 60], [70, 70], [40, 55]],
+    'buch': [19, 32, 73, 146, 229, 256],
+    'eigene': [
+      [[95, 70], [120, 65], [140, 60], [70, 70], [40, 55]],
+    ],
+    'eigene_anteil': 50,
     'hell': {'standard': 45, 'decke': 20, 'streifen': 50, 'nacht': 30},
     'kelvin': 3000,
-    'streuung': 6,
+    'streuung': 5,
     'uebergang': 3,
   },
 } -%}
@@ -124,6 +177,7 @@
   AB HIER: LOGIK
 ========================================================================= -#}
 
+{%- from 'lichtstimmung_buch.jinja' import BUCH -%}
 {%- set FARBMODI = ['hs', 'rgb', 'rgbw', 'rgbww', 'xy'] -%}
 {%- set FAVORIT = '★ ' -%}
 
@@ -176,47 +230,82 @@
 {{- MODI.get(basis(modus), {}).get('uebergang', 1.5) -}}
 {%- endmacro -%}
 
+{#- Alle Kombinationen, aus denen ein Modus wählen kann: [[Name, Palette], …] -#}
+{%- macro _topf(m, nur_eigene) -%}
+{%- set ns = namespace(l=[]) -%}
+{%- if nur_eigene -%}
+  {%- for p in m.get('eigene', []) -%}
+    {%- set ns.l = ns.l + [['Eigene Palette ' ~ loop.index, p]] -%}
+  {%- endfor -%}
+{%- else -%}
+  {%- set nummern = BUCH.keys() | list if m.get('buch') == 'alle' else m.get('buch', []) -%}
+  {%- for nr in nummern if nr in BUCH -%}
+    {%- set ns.l = ns.l + [['Buch Nr. ' ~ nr, BUCH[nr]]] -%}
+  {%- endfor -%}
+{%- endif -%}
+{{- ns.l | to_json -}}
+{%- endmacro -%}
+
 {#- -------------------------------------------------------------------------
-  Farbzuweisung für einen Modus (JSON-Dict: Lampe -> Wert)
+  Farbzuweisung für einen Modus (JSON: {'lampen': {Lampe: Wert}, 'quelle': …})
   Wert: {'an': false}
         {'an': true, 'hs': [Farbton, Sättigung], 'hell': %}   Farblampen
         {'an': true, 'kelvin': K, 'hell': %}                  Weiß-Lampen
         {'an': true, 'hell': %}                               nur Helligkeit
-  Jede Aktivierung dreht die Palette zufällig weiter, wählt zufällig die
-  Laufrichtung und streut den Farbton leicht – Nachbarn bleiben harmonisch.
+  Wählt eine Kombination (nie zweimal hintereinander dieselbe), dreht sie
+  zufällig weiter, wählt die Laufrichtung und streut den Farbton leicht –
+  Nachbarn bleiben harmonisch.
 ------------------------------------------------------------------------- -#}
 {%- macro zuweisung(modus) -%}
-{%- set ns = namespace(out={}) -%}
+{%- set ns = namespace(out={}, quelle='') -%}
 {%- if modus is string and modus.startswith(FAVORIT) -%}
-  {%- set werte = (_favorit(modus) | from_json).get('lampen', {}) -%}
+  {%- set fav = _favorit(modus) | from_json -%}
+  {%- set werte = fav.get('lampen', {}) -%}
   {%- for l in LAMPEN if l.id in werte -%}
     {%- set ns.out = dict(ns.out, **{l.id: werte[l.id]}) -%}
   {%- endfor -%}
+  {%- set ns.quelle = fav.get('quelle', '') -%}
 {%- elif modus in MODI -%}
   {%- set m = MODI[modus] -%}
-  {%- set versatz = range(100) | random -%}
-  {%- set richtung = [1, -1] | random -%}
-  {%- set s = m.get('streuung', 5) | int -%}
-  {%- for l in LAMPEN -%}
-    {%- set palette = m.get('typ_farben', {}).get(l.typ, m.farben) -%}
-    {%- set f = palette[(versatz + richtung * loop.index0) % (palette | count)] -%}
-    {%- set hell = m.hell.get(l.typ, m.hell.get('standard', 50)) | int -%}
-    {%- set modi = state_attr(l.id, 'supported_color_modes') or [] -%}
-    {%- if hell <= 0 -%}
-      {%- set w = {'an': false} -%}
-    {%- elif modi | select('in', FARBMODI) | list | count > 0 -%}
-      {%- set farbton = (f[0] + (range(-s, s + 1) | random)) % 360 -%}
-      {%- set saettigung = [[f[1] + (range(-4, 5) | random), 0] | max, 100] | min -%}
-      {%- set w = {'an': true, 'hs': [farbton, saettigung], 'hell': hell} -%}
-    {%- elif 'color_temp' in modi -%}
-      {%- set w = {'an': true, 'kelvin': m.get('kelvin', 2700), 'hell': hell} -%}
-    {%- else -%}
-      {%- set w = {'an': true, 'hell': hell} -%}
-    {%- endif -%}
-    {%- set ns.out = dict(ns.out, **{l.id: w}) -%}
-  {%- endfor -%}
+  {%- set letzte = state_attr('sensor.lichtstimmung_zustand', 'quelle')
+        if is_state('sensor.lichtstimmung_zustand', modus) else none -%}
+  {%- set alle_buch = _topf(m, false) | from_json -%}
+  {%- set alle_eigene = _topf(m, true) | from_json -%}
+  {#- die zuletzt gezeigte Kombination nicht gleich noch einmal -#}
+  {%- set buch = alle_buch | rejectattr('0', 'eq', letzte) | list -%}
+  {%- set eigene = alle_eigene | rejectattr('0', 'eq', letzte) | list -%}
+  {%- set nimm_eigene = eigene | count > 0
+        and (buch | count == 0 or (range(100) | random) < m.get('eigene_anteil', 30)) -%}
+  {%- set topf = eigene if nimm_eigene else buch -%}
+  {%- set topf = topf if topf | count > 0 else alle_eigene + alle_buch -%}
+  {%- if topf | count > 0 -%}
+    {%- set wahl = topf | random -%}
+    {%- set ns.quelle = wahl[0] -%}
+    {%- set versatz = range(100) | random -%}
+    {%- set richtung = [1, -1] | random -%}
+    {%- set s = m.get('streuung', 5) | int -%}
+    {%- for l in LAMPEN -%}
+      {%- set palette = m.get('typ_farben', {}).get(l.typ, wahl[1]) -%}
+      {%- set f = palette[(versatz + richtung * loop.index0) % (palette | count)] -%}
+      {%- set grund = m.hell.get(l.typ, m.hell.get('standard', 50)) | int -%}
+      {%- set hell = [(grund * (f[2] if f | count > 2 else 1)) | round(0) | int, 1] | max if grund > 0 else 0 -%}
+      {%- set modi = state_attr(l.id, 'supported_color_modes') or [] -%}
+      {%- if hell <= 0 -%}
+        {%- set w = {'an': false} -%}
+      {%- elif modi | select('in', FARBMODI) | list | count > 0 -%}
+        {%- set farbton = (f[0] + (range(-s, s + 1) | random)) % 360 -%}
+        {%- set saettigung = [[f[1] + (range(-4, 5) | random), 0] | max, 100] | min -%}
+        {%- set w = {'an': true, 'hs': [farbton, saettigung], 'hell': hell} -%}
+      {%- elif 'color_temp' in modi -%}
+        {%- set w = {'an': true, 'kelvin': m.get('kelvin', 2700), 'hell': hell} -%}
+      {%- else -%}
+        {%- set w = {'an': true, 'hell': hell} -%}
+      {%- endif -%}
+      {%- set ns.out = dict(ns.out, **{l.id: w}) -%}
+    {%- endfor -%}
+  {%- endif -%}
 {%- endif -%}
-{{- ns.out | to_json -}}
+{{- {'lampen': ns.out, 'quelle': ns.quelle} | to_json -}}
 {%- endmacro -%}
 
 {#- Aktueller Zustand aller Lampen wie zuweisung(), Helligkeit aber exakt als 'bri' (1–255) -#}
@@ -248,7 +337,8 @@
 {%- set alt = alt if alt is mapping else {} -%}
 {%- set name = (d.get('name') or '') | string | trim -%}
 {%- if d.get('aktion') == 'speichern' and name -%}
-  {{- dict(alt, **{name: {'basis': d.get('basis', ''), 'lampen': d.get('lampen', {})}}) | to_json -}}
+  {%- set eintrag = {'basis': d.get('basis', ''), 'quelle': d.get('quelle', ''), 'lampen': d.get('lampen', {})} -%}
+  {{- dict(alt, **{name: eintrag}) | to_json -}}
 {%- elif d.get('aktion') == 'loeschen' -%}
   {%- set ns = namespace(out={}) -%}
   {%- for k, v in alt.items() if k != name -%}
@@ -274,12 +364,17 @@ LAMPEN ({{ LAMPEN | count }})
 {%- endif %}
 {%- endfor %}
 
-MODI
+MODI (Farbwörterbuch: {{ BUCH | count }} Kombinationen als Licht geeignet)
 {%- for name, m in MODI.items() %}
 {%- set typen = LAMPEN | map(attribute='typ') | unique | list %}
 {%- set ohne_hell = typen | reject('in', m.get('hell', {}).keys() | list) | list %}
-- {{ name }}{{ '' if m.get('aktiv', true) else ' (inaktiv)' }}: {{ m.get('farben', []) | count }} Farben
-{%- if m.get('farben', []) | count < 3 %} ⚠️ weniger als 3 Farben{% endif %}
+{%- set buch = _topf(m, false) | from_json %}
+{%- set eigene = m.get('eigene', []) %}
+{%- set fehlt = [] if m.get('buch') == 'alle' else m.get('buch', []) | reject('in', BUCH) | list %}
+- {{ name }}{{ '' if m.get('aktiv', true) else ' (inaktiv)' }}: {{ buch | count }} aus dem Buch, {{ eigene | count }} eigene
+{%- if buch | count + eigene | count == 0 %} ⚠️ keine Farben{% endif %}
+{%- if fehlt %} ⚠️ Buch-Nr. unbekannt oder als Licht ungeeignet: {{ fehlt | join(', ') }}{% endif %}
+{%- if eigene | map('count') | select('lt', 2) | list %} ⚠️ eigene Palette mit weniger als 2 Farben{% endif %}
 {%- if ohne_hell and 'standard' not in m.get('hell', {}) %} ⚠️ keine Helligkeit für: {{ ohne_hell | join(', ') }}{% endif %}
 {%- if name.startswith(FAVORIT) %} ⚠️ Name darf nicht mit „★“ beginnen{% endif %}
 {%- endfor %}

@@ -1,7 +1,13 @@
 # Lichtstimmung für Home Assistant
 
 Alle Lampen eines Raums leuchten gleichzeitig in **unterschiedlichen, zueinander
-passenden Farben** – je nach Modus (Cozy, Cyberpunk, Ruhig, Regen / Gewitter, …).
+passenden Farben** – je nach Modus (Cozy, Cyberpunk, Ruhig, Regen / Gewitter,
+Farbwörterbuch, …).
+
+- **Farben aus dem Buch:** Die Kombinationen stammen aus Sanzo Wadas
+  *A Dictionary of Color Combinations* (配色事典, Seigensha), dazu eigene
+  Paletten. Angezeigt wird, welche Buch-Nummer gerade leuchtet, damit du sie im
+  Buch nachschlagen kannst.
 
 - **Eine Taste** schaltet alles aus. Nur dann wechselt beim nächsten Einschalten
   der Modus.
@@ -15,16 +21,24 @@ passenden Farben** – je nach Modus (Cozy, Cyberpunk, Ruhig, Regen / Gewitter, 
 
 | Baustein | Aufgabe |
 |---|---|
-| `custom_templates/lichtstimmung.jinja` | **Deine Konfiguration:** Lampen (in Raumreihenfolge) und Farbpaletten der Modi |
+| `custom_templates/lichtstimmung.jinja` | **Deine Konfiguration:** Lampen (in Raumreihenfolge) und Modi (Buch-Nummern + eigene Paletten) |
+| `custom_templates/lichtstimmung_buch.jinja` | Die 333 als Licht geeigneten Kombinationen des Buchs (erzeugt, nicht bearbeiten) |
 | `packages/lichtstimmung.yaml` | Logik: Helfer, Skripte, Automationen, Speicher-Sensoren |
 | `dashboard/lichtstimmung-karte.yaml` | Fertige Dashboard-Karte |
 
-**Farbverteilung:** Jeder Modus hat eine Palette (3–5 Farben). Benachbarte
-Lampen bekommen benachbarte Palettenfarben. Bei jedem Einschalten wird die Palette
-zufällig gedreht und der Farbton leicht gestreut, deshalb sieht es jedes Mal
-etwas anders aus, bleibt aber stimmig. Lampen, die nur Weiß können, bekommen
-die passende Farbtemperatur des Modus. Lampen, die nur dimmen können, bekommen
-die passende Helligkeit.
+**Farbverteilung:** Bei jedem Einschalten wählt der Modus eine Kombination: aus
+seiner Liste von Buch-Nummern oder aus deinen eigenen Paletten, nie zweimal
+hintereinander dieselbe. Benachbarte Lampen bekommen benachbarte Farben der
+Kombination, die Reihenfolge wird zufällig gedreht und der Farbton leicht
+gestreut. So sieht es jedes Mal etwas anders aus, bleibt aber stimmig. Lampen,
+die nur Weiß können, bekommen die Farbtemperatur des Modus. Lampen, die nur
+dimmen können, bekommen die passende Helligkeit.
+
+**Vom Buch zum Licht:** Die Druckfarben werden in Lampenfarben umgerechnet.
+Der Farbton bleibt, blasse Farben werden etwas kräftiger, dunkle Farben leuchten
+gedämpfter. Helle Neutraltöne (Weiß, Elfenbein) werden zu warmweißem Licht.
+Schwarz und Grau lassen sich nicht leuchten und entfallen. 15 der 348
+Kombinationen bestehen fast nur daraus und sind deshalb nicht dabei.
 
 **Taste und Moduswechsel:**
 
@@ -48,7 +62,8 @@ werden.
    ```
 2. Dateien kopieren (z. B. mit dem File-Editor- oder Samba-Add-on):
    - `homeassistant/packages/lichtstimmung.yaml` → `/config/packages/`
-   - `homeassistant/custom_templates/lichtstimmung.jinja` → `/config/custom_templates/`
+   - `homeassistant/custom_templates/lichtstimmung.jinja` und
+     `lichtstimmung_buch.jinja` → `/config/custom_templates/`
 3. In `lichtstimmung.jinja` unter **1) LAMPEN** deine Lampen eintragen.
 4. Home Assistant **neu starten** (einmalig; später reicht das Skript
    „Lichtstimmung – Konfiguration neu laden“).
@@ -70,7 +85,9 @@ Ab Home Assistant 2024.10 (neue `triggers:`/`actions:`-Schreibweise).
 |---|---|
 | Alles an/aus | Taste oder Skript „Lichtstimmung – Taste“ |
 | Modus direkt wählen | Auswahl „Lichtstimmung“ |
-| Gleicher Modus, neue Verteilung | Skript „Neu würfeln“ |
+| Gleicher Modus, andere Kombination | Skript „Neu würfeln“ |
+| Welche Buch-Kombination leuchtet? | Zeile „Kombination“ in der Karte, z. B. „Buch Nr. 236“ |
+| Das ganze Buch durchstöbern | Modus „Farbwörterbuch“ + „Neu würfeln“, Treffer als Favorit speichern |
 | Favorit speichern | optional Namen eintippen → „Als Favorit speichern“ (ohne Namen: z. B. „Cozy 04.10. 21:15“) |
 | Favorit abrufen | in der Auswahl „★ Name“ wählen |
 | Favorit löschen | Favorit auswählen (oder Namen eintippen) → „Favorit löschen“ |
@@ -78,25 +95,47 @@ Ab Home Assistant 2024.10 (neue `triggers:`/`actions:`-Schreibweise).
 | Favoriten mit in den Wechsel nehmen | Schalter „Favoriten im Wechsel“ |
 | Blitze bei Regen / Gewitter | Schalter „Gewitter-Blitze“ (ist anfangs aus) |
 
-## Neuen Modus anlegen
+## Modi anpassen und neu anlegen
 
-In `lichtstimmung.jinja` unter **2) MODI** einen Block kopieren, Namen und
-Farben ändern, dann „Lichtstimmung – Konfiguration neu laden“ ausführen.
-Vorbereitet (mit `'aktiv': false`): Sonnenuntergang, Nordlicht, Ozean, Wald.
+In `lichtstimmung.jinja` unter **2) MODI** einen Block kopieren, Namen ändern,
+Buch-Nummern und/oder eigene Paletten eintragen, dann „Lichtstimmung –
+Konfiguration neu laden“ ausführen. Vorbereitet (mit `'aktiv': false`):
+Sonnenuntergang, Nordlicht, Ozean, Wald.
 
 ```jinja
 'Kino': {
   'aktiv': true,
-  'farben': [[230, 90], [250, 85], [210, 80]],   {# [Farbton 0–360, Sättigung 0–100] #}
+  'buch': [106, 139, 218],
+  'eigene': [
+    [[230, 90], [250, 85], [210, 80]],
+  ],
+  'eigene_anteil': 30,
   'hell': {'standard': 15, 'decke': 0, 'streifen': 25},
   'kelvin': 2700,
-  'streuung': 4,
+  'streuung': 3,
   'uebergang': 3,
 },
 ```
 
-Farbton-Orientierung: 0 Rot · 30 Orange · 60 Gelb · 120 Grün · 180 Cyan ·
-220 Blau · 270 Violett · 300 Magenta · 330 Pink.
+Innerhalb von `MODI` keine `{# … #}`-Kommentare schreiben, das ist dort ein
+Syntaxfehler. Was die Felder bedeuten, steht im Kommentarblock darüber.
+
+- **Buch-Nummern:** Die Nummer steht im Buch bei jeder Kombination
+  (1–120: 2 Farben, 121–240: 3, 241–348: 4). `'buch': 'alle'` nimmt das ganze
+  Buch. Die Listen der Modi sind nach Farbton, Sättigung und Helligkeit
+  vorsortiert. Gefällt dir eine Kombination im Buch, trag ihre Nummer einfach
+  dazu.
+- **Eigene Paletten:** beliebig viele, je 2–5 Farben. Farbton-Orientierung:
+  0 Rot · 30 Orange · 60 Gelb · 120 Grün · 180 Cyan · 220 Blau · 270 Violett ·
+  300 Magenta · 330 Pink.
+- Der Konfig-Check (`pruefen()`) meldet unbekannte oder als Licht ungeeignete
+  Buch-Nummern.
+
+Vorschläge passender Buch-Nummern für eine Stimmung:
+
+```bash
+python3 tools/buch_importieren.py --vorschlaege
+```
 
 ## Tipps
 
@@ -119,6 +158,15 @@ Die Logik wird gegen ein echtes Home Assistant mit simulierten Lampen
 pip install -r requirements-test.txt
 pytest
 ```
+
+## Quellen
+
+- Sanzo Wada (1883–1967): *A Dictionary of Color Combinations* / 配色事典,
+  Seigensha Art.
+- Farbdaten: [mattdesl/dictionary-of-colour-combinations](https://github.com/mattdesl/dictionary-of-colour-combinations)
+  (MIT, © 2020 Matt DesLauriers; ursprünglich von Dain M. Blodorn Kim),
+  Kopie unter `tools/wada/`. `tools/buch_importieren.py` erzeugt daraus
+  `lichtstimmung_buch.jinja`.
 
 ## Raum-Layout
 

@@ -70,6 +70,10 @@ template:
           offen: >
             {{ trigger.event.data.offen if 'offen' in trigger.event.data
                else this.attributes.get('offen', []) }}
+          # z. B. „Buch Nr. 236“ – im Farbwörterbuch nachschlagen
+          quelle: >
+            {{ trigger.event.data.quelle if 'quelle' in trigger.event.data
+               else this.attributes.get('quelle', '') }}
           stand: >
             {{ trigger.event.data.stand if 'stand' in trigger.event.data
                else this.attributes.get('stand', '') }}
@@ -262,20 +266,26 @@ script:
             {{ modus if modus is defined and modus else states('input_select.lichtstimmung_modus') }}
           alles_an: "{{ einschalten | default(false) | bool }}"
           neu_wuerfeln: "{{ neu | default(true) | bool }}"
-          frisch: >
+          ergebnis: >
             {% from 'lichtstimmung.jinja' import zuweisung %}
             {{ zuweisung(ziel) | from_json }}
+          wiederverwenden: >
+            {{ not neu_wuerfeln and is_state('sensor.lichtstimmung_zustand', ziel)
+               and state_attr('sensor.lichtstimmung_zustand', 'zuweisung') is mapping }}
           plan: >
             {% set alt = state_attr('sensor.lichtstimmung_zustand', 'zuweisung') %}
-            {% if not neu_wuerfeln and states('sensor.lichtstimmung_zustand') == ziel and alt is mapping %}
+            {% if wiederverwenden %}
               {% set ns = namespace(out={}) %}
-              {% for id, w in frisch.items() %}
+              {% for id, w in ergebnis.lampen.items() %}
                 {% set ns.out = dict(ns.out, **{id: alt.get(id, w)}) %}
               {% endfor %}
               {{ ns.out }}
             {% else %}
-              {{ frisch }}
+              {{ ergebnis.lampen }}
             {% endif %}
+          quelle: >
+            {{ (state_attr('sensor.lichtstimmung_zustand', 'quelle') if wiederverwenden
+                else ergebnis.quelle) or '' }}
           jetzt: >
             {% set ns = namespace(l=[]) %}
             {% for id, w in plan.items() %}
@@ -308,6 +318,7 @@ script:
         event_data:
           modus: "{{ ziel }}"
           zuweisung: "{{ plan }}"
+          quelle: "{{ quelle }}"
           offen: "{{ offen }}"
           stand: "{{ stand }}"
       - wait_template: "{{ state_attr('sensor.lichtstimmung_zustand', 'stand') == stand }}"
@@ -442,6 +453,7 @@ script:
           aktion: speichern
           name: "{{ fav_name }}"
           basis: "{{ basis_modus }}"
+          quelle: "{{ state_attr('sensor.lichtstimmung_zustand', 'quelle') or '' }}"
           lampen: "{{ werte }}"
       # Warten, bis der Favorit in der Modus-Auswahl auftaucht, dann auswählen.
       - wait_template: >

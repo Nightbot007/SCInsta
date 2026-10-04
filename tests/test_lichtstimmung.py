@@ -1,15 +1,22 @@
 """Verhaltenstests der Lichtstimmung gegen ein echtes Home Assistant."""
 
 import asyncio
+import re
+import sys
 from datetime import timedelta
 
 import pytest
 from homeassistant.helpers.template import Template
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
-from conftest import LAMPEN, LAMPEN_IDS, richte_ein
+from conftest import LAMPEN, LAMPEN_IDS, REPO, richte_ein
+
+sys.path.insert(0, str(REPO / "tools"))
+import buch_importieren  # noqa: E402
 
 FARBLAMPEN = ["light.deckenlampe", "light.stehlampe", "light.led_streifen"]
+MODI = ["Cozy", "Cyberpunk", "Ruhig", "Regen / Gewitter", "Farbwörterbuch"]
+BUCH = buch_importieren.lampen_kombinationen()
 
 
 # --------------------------------------------------------------------------- Hilfen
@@ -72,6 +79,45 @@ def flag(hass):
     return hass.states.get("input_boolean.lichtstimmung_wechsel_faellig").state
 
 
+def hs(hass, entity_id):
+    h, s = hass.states.get(entity_id).attributes["hs_color"]
+    return round(h), round(s)
+
+
+def quelle(hass):
+    return zustand(hass).attributes["quelle"]
+
+
+def folgt_dem_plan(hass):
+    """Jede eingeschaltete Lampe leuchtet genau so, wie im Zustand gespeichert."""
+    plan = zustand(hass).attributes["zuweisung"]
+    for l in LAMPEN_IDS:
+        w = plan[l]
+        assert ist_an(hass, l) == w["an"], l
+        if w.get("hs"):
+            assert hass.states.get(l).attributes["hs_color"] == pytest.approx(w["hs"], abs=0.5), l
+            assert round(hass.states.get(l).attributes["brightness"] / 2.55) == w["hell"], l
+        if w.get("kelvin"):
+            assert hass.states.get(l).attributes["color_temp_kelvin"] == w["kelvin"], l
+
+
+def nah_an(h, farbtoene, toleranz):
+    return any(min(abs(h - f) % 360, 360 - abs(h - f) % 360) <= toleranz for f in farbtoene)
+
+
+def anpassen(modus, ersatz):
+    """Ersetzt in der Jinja den Block eines Modus bis 'hell' (für gezielte Tests)."""
+
+    def f(jinja):
+        neu, n = re.subn(
+            rf"('{re.escape(modus)}': \{{\n).*?(\n    'hell')", rf"\g<1>{ersatz}\g<2>", jinja, count=1, flags=re.S
+        )
+        assert n == 1
+        return neu
+
+    return f
+
+
 def im_bereich(h, von, bis, toleranz=10):
     """Farbton (mit Streuung) liegt im Bereich der Palette, auch über 0° hinweg."""
     von, bis = (von - toleranz) % 360, (bis + toleranz) % 360
@@ -81,7 +127,7 @@ def im_bereich(h, von, bis, toleranz=10):
 # --------------------------------------------------------------------------- Tests
 async def test_einrichtung_und_konfig_check(lichtstimmung):
     hass = lichtstimmung
-    assert auswahl(hass).attributes["options"] == ["Cozy", "Cyberpunk", "Ruhig", "Regen / Gewitter"]
+    assert auswahl(hass).attributes["options"] == MODI
     bericht = Template(
         "{% from 'lichtstimmung.jinja' import pruefen %}{{ pruefen() }}", hass
     ).async_render()
@@ -89,6 +135,9 @@ async def test_einrichtung_und_konfig_check(lichtstimmung):
     assert "light.nachttischlampe [nacht]: off · nur Weiß (Kelvin)" in bericht
     assert "light.stehlampe [steh]: off · Farbe" in bericht
     assert "Sonnenuntergang (inaktiv)" in bericht
+    assert f"Farbwörterbuch: {len(BUCH)} Kombinationen als Licht geeignet" in bericht
+    assert "- Cozy: 26 aus dem Buch, 1 eigene" in bericht
+    assert f"- Farbwörterbuch: {len(BUCH)} aus dem Buch, 0 eigene" in bericht
 
 
 async def test_taste_schaltet_alles_an_mit_passenden_unterschiedlichen_farben(lichtstimmung):
@@ -96,13 +145,16 @@ async def test_taste_schaltet_alles_an_mit_passenden_unterschiedlichen_farben(li
     await taste(hass)
     assert all(ist_an(hass, l) for l in LAMPEN_IDS)
     assert modus(hass) == "Cozy"
-    farben = [farbton(hass, l) for l in FARBLAMPEN]
-    assert len({round(f) for f in farben}) == 3, farben
-    assert all(im_bereich(f, 12, 45) for f in farben), farben
+    assert re.fullmatch(r"Buch Nr\. \d+|Eigene Palette 1", quelle(hass)), quelle(hass)
+    folgt_dem_plan(hass)
+    farben = [hs(hass, l) for l in FARBLAMPEN]
+    assert len(set(farben)) >= 2, farben  # nie alle gleich
+    # Cozy: nur warme Töne (Rot bis Gelb) oder warmweiß
+    assert all(im_bereich(h, 340, 50, toleranz=4) or s <= 20 for h, s in farben), farben
     nacht = hass.states.get("light.nachttischlampe")
     assert nacht.attributes["color_mode"] == "color_temp"
     assert nacht.attributes["color_temp_kelvin"] == 2200
-    assert round(hass.states.get("light.stehlampe").attributes["brightness"] / 2.55) == 60
+    assert 1 <= round(hass.states.get("light.stehlampe").attributes["brightness"] / 2.55) <= 60
     assert flag(hass) == "off"
 
 
@@ -118,7 +170,9 @@ async def test_alles_aus_ueber_taste_wechselt_beim_naechsten_einschalten(lichtst
     assert modus(hass) == "Cyberpunk"
     assert auswahl(hass).state == "Cyberpunk"
     assert flag(hass) == "off"
-    assert all(im_bereich(farbton(hass, l), 190, 325) for l in FARBLAMPEN)
+    folgt_dem_plan(hass)
+    # Cyberpunk: Blau, Türkis, Violett, Magenta, Pink, Karmin – kein Gelb/Grün
+    assert all(im_bereich(h, 165, 15, toleranz=6) or s <= 20 for h, s in (hs(hass, l) for l in FARBLAMPEN))
 
     await taste(hass)
     await taste(hass)
@@ -127,6 +181,11 @@ async def test_alles_aus_ueber_taste_wechselt_beim_naechsten_einschalten(lichtst
     await taste(hass)
     assert modus(hass) == "Regen / Gewitter"
     assert not ist_an(hass, "light.deckenlampe")  # Helligkeit 0 in diesem Modus
+    await taste(hass)
+    await taste(hass)
+    assert modus(hass) == "Farbwörterbuch"
+    assert quelle(hass).startswith("Buch Nr. ")
+    folgt_dem_plan(hass)
     await taste(hass)
     await taste(hass)
     assert modus(hass) == "Cozy"  # einmal rum
@@ -171,7 +230,9 @@ async def test_nach_taste_aus_startet_auch_eine_einzelne_lampe_den_neuen_modus(l
     await licht(hass, "on", "light.stehlampe")
     assert modus(hass) == "Cyberpunk"
     assert flag(hass) == "off"
-    assert im_bereich(farbton(hass, "light.stehlampe"), 190, 325)
+    assert hass.states.get("light.stehlampe").attributes["hs_color"] == pytest.approx(
+        zustand(hass).attributes["zuweisung"]["light.stehlampe"]["hs"], abs=0.5
+    )
     assert not ist_an(hass, "light.led_streifen")
     assert set(zustand(hass).attributes["offen"]) == {
         "light.deckenlampe",
@@ -192,7 +253,7 @@ async def test_modus_im_dashboard_waehlen(lichtstimmung):
     await taste(hass)  # Cozy
     await waehle(hass, "Ruhig")
     assert modus(hass) == "Ruhig"
-    assert all(im_bereich(farbton(hass, l), 175, 250) for l in FARBLAMPEN)
+    folgt_dem_plan(hass)
     assert hass.states.get("light.nachttischlampe").attributes["color_temp_kelvin"] == 2700
 
     # Nach „Alles aus“ eine Auswahl treffen: die Wahl gilt, kein weiterer Wechsel.
@@ -209,18 +270,22 @@ async def test_neu_wuerfeln_gibt_neue_verteilung(lichtstimmung):
     hass = lichtstimmung
     await taste(hass)
     vorher = zustand(hass).attributes["stand"]
-    varianten = set()
-    for _ in range(6):
+    varianten, quellen = set(), [quelle(hass)]
+    for _ in range(8):
         await skript(hass, "lichtstimmung_neu_wuerfeln")
-        varianten.add(tuple(round(farbton(hass, l)) for l in FARBLAMPEN))
+        folgt_dem_plan(hass)
+        varianten.add(tuple(hs(hass, l) for l in FARBLAMPEN))
+        quellen.append(quelle(hass))
     assert zustand(hass).attributes["stand"] != vorher
     assert modus(hass) == "Cozy"
     assert len(varianten) > 1
+    assert all(a != b for a, b in zip(quellen, quellen[1:])), quellen  # nie zweimal hintereinander
 
 
 async def test_favorit_speichern_abrufen_und_loeschen(lichtstimmung):
     hass = lichtstimmung
     await taste(hass)  # Cozy
+    herkunft = quelle(hass)
     await licht(hass, "on", "light.stehlampe", hs_color=[5, 100], brightness=200)
     await hass.services.async_call(
         "input_text",
@@ -233,6 +298,7 @@ async def test_favorit_speichern_abrufen_und_loeschen(lichtstimmung):
     fav = hass.states.get("sensor.lichtstimmung_favoriten")
     assert fav.state == "1"
     assert fav.attributes["favoriten"]["Abendrot"]["basis"] == "Cozy"
+    assert fav.attributes["favoriten"]["Abendrot"]["quelle"] == herkunft
     assert "★ Abendrot" in auswahl(hass).attributes["options"]
     assert auswahl(hass).state == "★ Abendrot"
     assert modus(hass) == "★ Abendrot"
@@ -248,6 +314,7 @@ async def test_favorit_speichern_abrufen_und_loeschen(lichtstimmung):
         assert hass.states.get(l).attributes["hs_color"] == pytest.approx(gespeichert[l], abs=0.1)
     assert hass.states.get("light.stehlampe").attributes["brightness"] == 200
     assert hass.states.get("light.nachttischlampe").attributes["color_temp_kelvin"] == 2200
+    assert quelle(hass) == herkunft
 
     # Aktiven Favoriten löschen: Auswahl springt auf den ersten Modus, Lampen bleiben.
     vorher = {l: hass.states.get(l).attributes["hs_color"] for l in FARBLAMPEN}
@@ -279,7 +346,7 @@ async def test_favoriten_im_wechsel_und_zufall(lichtstimmung):
     await taste(hass)
     await taste(hass)
     assert modus(hass) == "Cozy"
-    for erwartet in ("Cyberpunk", "Ruhig", "Regen / Gewitter", "Cozy"):
+    for erwartet in ("Cyberpunk", "Ruhig", "Regen / Gewitter", "Farbwörterbuch", "Cozy"):
         await taste(hass)
         await taste(hass)
         assert modus(hass) == erwartet
@@ -290,7 +357,7 @@ async def test_favoriten_im_wechsel_und_zufall(lichtstimmung):
         {"entity_id": "input_boolean.lichtstimmung_favoriten_im_wechsel"},
         blocking=True,
     )
-    for erwartet in ("Cyberpunk", "Ruhig", "Regen / Gewitter", "★ Liebling", "Cozy"):
+    for erwartet in ("Cyberpunk", "Ruhig", "Regen / Gewitter", "Farbwörterbuch", "★ Liebling", "Cozy"):
         await taste(hass)
         await taste(hass)
         assert modus(hass) == erwartet
@@ -405,7 +472,11 @@ async def test_lampe_nur_helligkeit_und_fehlende_lampe(hass, tmp_path):
     await taste(hass)
     tisch = hass.states.get("light.tischlampe")
     assert tisch.state == "on"
-    assert round(tisch.attributes["brightness"] / 2.55) == 45  # 'standard' bei Cozy
+    # 'standard' bei Cozy = 45 %, gedämpft nach Helligkeit der Buchfarbe
+    plan = zustand(hass).attributes["zuweisung"]["light.tischlampe"]
+    assert plan.keys() == {"an", "hell"}
+    assert round(tisch.attributes["brightness"] / 2.55) == plan["hell"]
+    assert 1 <= plan["hell"] <= 45
     assert all(ist_an(hass, l) for l in LAMPEN_IDS)
 
 
@@ -432,6 +503,116 @@ async def test_nach_neustart_wird_die_auswahl_wiederhergestellt(lichtstimmung):
     assert modus(hass) == "Ruhig"
 
     await skript(hass, "lichtstimmung_neu_laden")
-    assert auswahl(hass).attributes["options"] == ["Cozy", "Cyberpunk", "Ruhig", "Regen / Gewitter"]
+    assert auswahl(hass).attributes["options"] == MODI
     assert auswahl(hass).state == "Ruhig"
     assert {l: farbton(hass, l) for l in FARBLAMPEN} == farben
+
+
+# --------------------------------------------------------------------------- Farbwörterbuch
+def test_buchdatei_ist_aktuell():
+    """lichtstimmung_buch.jinja entspricht dem, was tools/buch_importieren.py erzeugt."""
+    erwartet = buch_importieren.jinja_inhalt(BUCH)
+    assert buch_importieren.ZIEL.read_text(encoding="utf-8") == erwartet, (
+        "Bitte `python3 tools/buch_importieren.py` ausführen"
+    )
+    assert len(BUCH) == 333
+    assert all(2 <= len(farben) <= 4 for farben in BUCH.values())
+
+
+async def test_buch_kombination_wird_originalgetreu_verteilt(hass, tmp_path):
+    nr = 236  # drei Farben
+    farben = BUCH[nr]
+    await richte_ein(
+        hass,
+        tmp_path,
+        jinja_anpassen=anpassen(
+            "Cozy",
+            f"    'aktiv': true,\n    'buch': [{nr}],\n"
+            "    'eigene': [[[38, 70], [30, 88], [22, 92]]],\n    'eigene_anteil': 0,",
+        ),
+    )
+    await taste(hass)
+    assert quelle(hass) == f"Buch Nr. {nr}"
+    folgt_dem_plan(hass)
+    for l, hell in (("light.deckenlampe", 20), ("light.stehlampe", 60), ("light.led_streifen", 40)):
+        h, s = hass.states.get(l).attributes["hs_color"]
+        prozent = round(hass.states.get(l).attributes["brightness"] / 2.55)
+        # passende Buchfarbe: Farbton ± Streuung, Helligkeit = Typ-Helligkeit × Faktor der Farbe
+        assert any(
+            nah_an(h, [f["h"]], 4 + 1) and abs(s - f["s"]) <= 4 + 1 and prozent == max(round(hell * f["f"]), 1)
+            for f in farben
+        ), (l, h, s, prozent, farben)
+    # Alle Farben der Kombination kommen vor (3 Farblampen, 3 Farben).
+    assert {min(range(3), key=lambda i: abs(farben[i]["h"] - hs(hass, l)[0])) for l in FARBLAMPEN} == {0, 1, 2}
+
+
+async def test_eigene_palette(hass, tmp_path):
+    await richte_ein(
+        hass,
+        tmp_path,
+        jinja_anpassen=anpassen(
+            "Cozy",
+            "    'aktiv': true,\n    'buch': [236],\n"
+            "    'eigene': [[[38, 70], [30, 88], [22, 92]]],\n    'eigene_anteil': 100,",
+        ),
+    )
+    await taste(hass)
+    assert quelle(hass) == "Eigene Palette 1"
+    folgt_dem_plan(hass)
+    assert all(nah_an(hs(hass, l)[0], [38, 30, 22], 5) for l in FARBLAMPEN)
+    assert round(hass.states.get("light.stehlampe").attributes["brightness"] / 2.55) == 60
+
+
+async def test_farbwoerterbuch_modus(lichtstimmung):
+    hass = lichtstimmung
+    await taste(hass)
+    await waehle(hass, "Farbwörterbuch")
+    quellen = [quelle(hass)]
+    for _ in range(6):
+        await skript(hass, "lichtstimmung_neu_wuerfeln")
+        folgt_dem_plan(hass)
+        quellen.append(quelle(hass))
+    nummern = [int(q.removeprefix("Buch Nr. ")) for q in quellen]
+    assert all(n in BUCH for n in nummern), quellen
+    assert all(a != b for a, b in zip(nummern, nummern[1:])), nummern
+
+
+async def test_konfig_check_meldet_falsche_buchnummern(hass, tmp_path):
+    ungeeignet = min(set(range(1, 349)) - set(BUCH))
+    await richte_ein(
+        hass,
+        tmp_path,
+        jinja_anpassen=anpassen("Cozy", f"    'aktiv': true,\n    'buch': [236, 999, {ungeeignet}],"),
+    )
+    bericht = Template(
+        "{% from 'lichtstimmung.jinja' import pruefen %}{{ pruefen() }}", hass
+    ).async_render()
+    assert f"- Cozy: 1 aus dem Buch, 0 eigene ⚠️ Buch-Nr. unbekannt oder als Licht ungeeignet: 999, {ungeeignet}" in bericht
+
+
+async def test_nie_zweimal_dieselbe_kombination(hass, tmp_path):
+    """Nur eine eigene Palette und immer eigene bevorzugt: es muss abwechseln."""
+    await richte_ein(
+        hass,
+        tmp_path,
+        jinja_anpassen=anpassen(
+            "Cozy",
+            "    'aktiv': true,\n    'buch': [236],\n"
+            "    'eigene': [[[38, 70], [30, 88], [22, 92]]],\n    'eigene_anteil': 100,",
+        ),
+    )
+    await taste(hass)
+    quellen = [quelle(hass)]
+    for _ in range(4):
+        await skript(hass, "lichtstimmung_neu_wuerfeln")
+        quellen.append(quelle(hass))
+    assert quellen == ["Eigene Palette 1", "Buch Nr. 236"] * 2 + ["Eigene Palette 1"]
+
+
+def test_readme_beispiel_ist_gueltiges_jinja():
+    import jinja2
+
+    readme = (REPO / "README.md").read_text(encoding="utf-8")
+    block = re.search(r"```jinja\n(.*?)```", readme, re.S).group(1)
+    modi = jinja2.Environment().from_string("{%- set M = {\n" + block + "} -%}{{ M | list }}").render()
+    assert modi == "['Kino']"
