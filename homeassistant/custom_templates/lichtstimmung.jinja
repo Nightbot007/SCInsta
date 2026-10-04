@@ -12,22 +12,43 @@
 
 {#- -------------------------------------------------------------------------
   1) LAMPEN
-  Reihenfolge = Position im Raum, einmal rundherum (z. B. im Uhrzeigersinn
-  ab der Tür). Nebeneinander liegende Lampen bekommen benachbarte Farben aus
-  der Palette – so entsteht ein harmonischer Verlauf durch den Raum.
+  Reihenfolge = Position im Raum, einmal rundherum. Nebeneinander liegende
+  Lampen bekommen benachbarte Farben der Kombination – so entsteht ein
+  harmonischer Verlauf durch den Raum.
 
-  typ: frei wählbar; wird bei den Modi unter 'hell' (Helligkeit je Typ) und
-       optional 'typ_farben' verwendet. Vorschläge:
-       decke, steh, streifen, nacht, tisch, spot
+  Dein Zimmer, im Uhrzeigersinn ab der Tür:
+    1  Hue Play auf der Kommode (TV-Wand, links)        Philips Hue
+    2  TV-Backlight                                     FancyLEDs
+    3  Kommode, Unterbeleuchtung                        FancyLEDs
+    4  IKEA-Regal rechts vom TV, unten                  Govee
+    5  IKEA-Regal rechts vom TV, oben                   Govee
+    6  Floor Lamp Pro am Fenster                        Govee
+    7  Hue Play im Treppenregal                         Philips Hue
+    8  Hue unten am Regal überm Bett, rechts            Philips Hue
+    9  Hue unten am Regal überm Bett, links             Philips Hue
+
+  id     Entity-ID in Home Assistant. Am einfachsten benennst du die Lampen
+         in Home Assistant genau so um (siehe docs/installation.md).
+  typ    steuert die Helligkeit je Modus (siehe 'hell' bei den Modi):
+         play = Hue Play, tv = TV-Backlight, unterbau = indirektes Licht
+         unter Möbeln, regal = Regalbeleuchtung, steh = Stehlampe.
+  blitz  true = darf bei „Gewitter-Blitze“ aufblitzen. Nur für Lampen mit
+         schneller lokaler Verbindung (Hue). Über die Cloud angebundene
+         Lampen sind dafür zu träge und haben Befehlslimits.
 
   Ob eine Lampe Farbe, nur Weiß (Farbtemperatur) oder nur Helligkeit kann,
   erkennt Home Assistant selbst – das muss hier nicht eingetragen werden.
 ------------------------------------------------------------------------- -#}
 {%- set LAMPEN = [
-  {'id': 'light.deckenlampe',     'typ': 'decke'},
-  {'id': 'light.stehlampe',       'typ': 'steh'},
-  {'id': 'light.led_streifen',    'typ': 'streifen'},
-  {'id': 'light.nachttischlampe', 'typ': 'nacht'},
+  {'id': 'light.hue_play_kommode',          'typ': 'play',     'blitz': true},
+  {'id': 'light.tv_backlight',              'typ': 'tv',       'blitz': false},
+  {'id': 'light.kommode_unterbeleuchtung',  'typ': 'unterbau', 'blitz': false},
+  {'id': 'light.regal_rechts_unten',        'typ': 'unterbau', 'blitz': false},
+  {'id': 'light.regal_rechts_oben',         'typ': 'regal',    'blitz': false},
+  {'id': 'light.govee_floor_lamp',          'typ': 'steh',     'blitz': false},
+  {'id': 'light.hue_play_treppenregal',     'typ': 'play',     'blitz': true},
+  {'id': 'light.hue_regal_rechts',          'typ': 'regal',    'blitz': true},
+  {'id': 'light.hue_regal_links',           'typ': 'regal',    'blitz': true},
 ] -%}
 
 {#- -------------------------------------------------------------------------
@@ -55,8 +76,9 @@
                  jede Aktivierung etwas anders aus – Lieblingsvarianten kann
                  man als Favorit speichern.
   uebergang      Überblendzeit in Sekunden.
-  typ_farben     (optional) eigene Palette für einen Lampentyp,
-                 z. B. die Nachttischlampe immer warm.
+  typ_farben     (optional) eigene Palette für einen Lampentyp, z. B.
+                 'typ_farben': {'steh': [[32, 55], [26, 60]]} = Stehlampe
+                 immer warm.
   effekt         (optional) 'blitze' = gelegentliche Blitze (Gewitter).
   aktiv          false = Modus ist vorbereitet, aber nicht in der Auswahl.
 
@@ -72,7 +94,7 @@
     'eigene': [
       [[38, 70], [30, 88], [22, 92], [12, 80], [45, 60]],
     ],
-    'hell': {'standard': 45, 'decke': 20, 'steh': 60, 'streifen': 40, 'nacht': 35},
+    'hell': {'standard': 45, 'play': 55, 'tv': 45, 'unterbau': 35, 'regal': 45, 'steh': 60},
     'kelvin': 2200,
     'streuung': 4,
     'uebergang': 2,
@@ -85,7 +107,7 @@
       [[310, 100], [190, 100], [280, 95], [205, 100]],
     ],
     'eigene_anteil': 50,
-    'hell': {'standard': 60, 'decke': 25, 'steh': 70, 'streifen': 85, 'nacht': 45},
+    'hell': {'standard': 65, 'play': 75, 'tv': 80, 'unterbau': 70, 'regal': 65, 'steh': 70},
     'kelvin': 6500,
     'streuung': 6,
     'uebergang': 1,
@@ -96,8 +118,7 @@
     'eigene': [
       [[200, 45], [220, 40], [250, 35], [175, 35]],
     ],
-    'typ_farben': {'nacht': [[32, 55], [26, 60]]},
-    'hell': {'standard': 30, 'decke': 10, 'steh': 35, 'streifen': 20, 'nacht': 25},
+    'hell': {'standard': 30, 'play': 30, 'tv': 25, 'unterbau': 20, 'regal': 25, 'steh': 35},
     'kelvin': 2700,
     'streuung': 3,
     'uebergang': 4,
@@ -108,7 +129,7 @@
     'eigene': [
       [[215, 90], [228, 85], [245, 80], [200, 70], [260, 70]],
     ],
-    'hell': {'standard': 30, 'decke': 0, 'steh': 35, 'streifen': 40, 'nacht': 20},
+    'hell': {'standard': 30, 'play': 35, 'tv': 30, 'unterbau': 25, 'regal': 25, 'steh': 30},
     'kelvin': 5000,
     'streuung': 4,
     'uebergang': 3,
@@ -117,7 +138,7 @@
   'Farbwörterbuch': {
     'aktiv': true,
     'buch': 'alle',
-    'hell': {'standard': 50, 'decke': 25, 'steh': 60, 'streifen': 55, 'nacht': 35},
+    'hell': {'standard': 50, 'play': 55, 'tv': 55, 'unterbau': 40, 'regal': 50, 'steh': 60},
     'kelvin': 3000,
     'streuung': 2,
     'uebergang': 2,
@@ -130,7 +151,7 @@
     'eigene': [
       [[350, 85], [10, 90], [25, 95], [40, 85], [300, 55]],
     ],
-    'hell': {'standard': 50, 'decke': 20, 'streifen': 60, 'nacht': 35},
+    'hell': {'standard': 50, 'tv': 55, 'unterbau': 40, 'steh': 60},
     'kelvin': 2300,
     'streuung': 5,
     'uebergang': 3,
@@ -142,7 +163,7 @@
       [[150, 90], [165, 85], [180, 70], [280, 65], [130, 75]],
     ],
     'eigene_anteil': 70,
-    'hell': {'standard': 45, 'decke': 15, 'streifen': 60, 'nacht': 30},
+    'hell': {'standard': 45, 'tv': 50, 'unterbau': 35},
     'kelvin': 5500,
     'streuung': 6,
     'uebergang': 3,
@@ -154,7 +175,7 @@
       [[190, 90], [205, 85], [175, 80], [220, 75], [160, 60]],
     ],
     'eigene_anteil': 50,
-    'hell': {'standard': 45, 'decke': 20, 'streifen': 55, 'nacht': 30},
+    'hell': {'standard': 45, 'tv': 50, 'unterbau': 35},
     'kelvin': 6000,
     'streuung': 5,
     'uebergang': 3,
@@ -166,7 +187,7 @@
       [[95, 70], [120, 65], [140, 60], [70, 70], [40, 55]],
     ],
     'eigene_anteil': 50,
-    'hell': {'standard': 45, 'decke': 20, 'streifen': 50, 'nacht': 30},
+    'hell': {'standard': 45, 'tv': 45, 'unterbau': 35},
     'kelvin': 3000,
     'streuung': 5,
     'uebergang': 3,
@@ -190,6 +211,15 @@
 {%- macro lampen_an() -%}
 {%- set ns = namespace(l=[]) -%}
 {%- for l in LAMPEN if is_state(l.id, 'on') -%}
+  {%- set ns.l = ns.l + [l.id] -%}
+{%- endfor -%}
+{{- ns.l | to_json -}}
+{%- endmacro -%}
+
+{#- Eingeschaltete Lampen, die bei Gewitter aufblitzen dürfen (JSON-Liste) -#}
+{%- macro blitz_kandidaten() -%}
+{%- set ns = namespace(l=[]) -%}
+{%- for l in LAMPEN if l.get('blitz', true) and is_state(l.id, 'on') -%}
   {%- set ns.l = ns.l + [l.id] -%}
 {%- endfor -%}
 {{- ns.l | to_json -}}
@@ -358,7 +388,7 @@
 LAMPEN ({{ LAMPEN | count }})
 {%- for l in LAMPEN %}
 {%- set modi = state_attr(l.id, 'supported_color_modes') or [] %}
-- {{ l.id }} [{{ l.typ }}]:
+- {{ l.id }} [{{ l.typ }}{{ ', blitzt' if l.get('blitz', true) else '' }}]:
 {%- if expand(l.id) | count == 0 %} ❌ nicht gefunden – Entity-ID prüfen
 {%- else %} {{ states(l.id) }} · {{ 'Farbe' if modi | select('in', FARBMODI) | list | count > 0 else ('nur Weiß (Kelvin)' if 'color_temp' in modi else 'nur Helligkeit') }}
 {%- endif %}

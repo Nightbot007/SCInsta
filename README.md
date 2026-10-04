@@ -55,29 +55,41 @@ werden.
 
 ## Installation
 
-1. In der `configuration.yaml` Packages aktivieren (falls noch nicht geschehen):
-   ```yaml
-   homeassistant:
-     packages: !include_dir_named packages
-   ```
-2. Dateien kopieren (z. B. mit dem File-Editor- oder Samba-Add-on):
-   - `homeassistant/packages/lichtstimmung.yaml` → `/config/packages/`
-   - `homeassistant/custom_templates/lichtstimmung.jinja` und
-     `lichtstimmung_buch.jinja` → `/config/custom_templates/`
-3. In `lichtstimmung.jinja` unter **1) LAMPEN** deine Lampen eintragen.
-4. Home Assistant **neu starten** (einmalig; später reicht das Skript
-   „Lichtstimmung – Konfiguration neu laden“).
-5. Prüfen: **Entwicklerwerkzeuge → Template** →
-   `{% from 'lichtstimmung.jinja' import pruefen %}{{ pruefen() }}`
-   zeigt, ob alle Lampen gefunden wurden und was sie können.
-6. Taste anbinden: in `lichtstimmung.yaml` bei der Automation
-   „Lichtstimmung – Taste gedrückt“ den passenden Auslöser einkommentieren
-   (Beispiele für Hue, Zigbee2MQTT, ZHA sind drin). Bis dahin funktioniert die
-   virtuelle Taste `input_button.lichtstimmung_taste` im Dashboard.
-7. Dashboard-Karte aus `homeassistant/dashboard/lichtstimmung-karte.yaml` einfügen
-   (Dashboard → Bearbeiten → Karte hinzufügen → Manuell).
+**Genaue Schritt-für-Schritt-Anleitung: [`docs/installation.md`](docs/installation.md)**
+(Lampen einbinden, Entity-IDs, Dateien kopieren, Taste, Dashboard).
 
-Ab Home Assistant 2024.10 (neue `triggers:`/`actions:`-Schreibweise).
+Kurzfassung:
+
+1. Hue (Integration „Philips Hue“), Govee („Govee lights local“) und FancyLEDs
+   (über Smart Life → Integration „Tuya“) in Home Assistant einbinden.
+2. Lampen auf die Entity-IDs aus `lichtstimmung.jinja` umbenennen.
+3. In `configuration.yaml`: `homeassistant: packages: !include_dir_named packages`
+4. `lichtstimmung.yaml` → `/config/packages/`,
+   `lichtstimmung.jinja` + `lichtstimmung_buch.jinja` → `/config/custom_templates/`
+5. Neu starten, mit `pruefen()` kontrollieren, Dashboard-Karte einfügen.
+
+Ab Home Assistant 2024.10.
+
+## Dein Zimmer
+
+Neun Lampen, im Uhrzeigersinn ab der Tür. In dieser Reihenfolge laufen die
+Farben einer Kombination durch den Raum:
+
+| # | Lampe | Marke | Entity-ID | Typ |
+|---|---|---|---|---|
+| 1 | Hue Play auf der Kommode | Philips Hue | `light.hue_play_kommode` | play |
+| 2 | TV-Backlight | FancyLEDs | `light.tv_backlight` | tv |
+| 3 | Kommode, Unterbeleuchtung | FancyLEDs | `light.kommode_unterbeleuchtung` | unterbau |
+| 4 | IKEA-Regal rechts vom TV, unten | Govee | `light.regal_rechts_unten` | unterbau |
+| 5 | IKEA-Regal rechts vom TV, oben | Govee | `light.regal_rechts_oben` | regal |
+| 6 | Floor Lamp Pro am Fenster | Govee | `light.govee_floor_lamp` | steh |
+| 7 | Hue Play im Treppenregal | Philips Hue | `light.hue_play_treppenregal` | play |
+| 8 | Hue unten am Regal überm Bett, rechts | Philips Hue | `light.hue_regal_rechts` | regal |
+| 9 | Hue unten am Regal überm Bett, links | Philips Hue | `light.hue_regal_links` | regal |
+
+Über den Typ legt jeder Modus die Helligkeit fest. Ein Beispiel: Bei
+Cyberpunk leuchten TV-Backlight und Unterbau kräftig, bei Ruhig ist alles
+gedämpft. Gewitter-Blitze laufen nur über die vier Hue-Lampen.
 
 ## Bedienung
 
@@ -110,7 +122,7 @@ Sonnenuntergang, Nordlicht, Ozean, Wald.
     [[230, 90], [250, 85], [210, 80]],
   ],
   'eigene_anteil': 30,
-  'hell': {'standard': 15, 'decke': 0, 'streifen': 25},
+  'hell': {'standard': 15, 'tv': 20, 'unterbau': 10},
   'kelvin': 2700,
   'streuung': 3,
   'uebergang': 3,
@@ -168,7 +180,8 @@ pytest
   Kopie unter `tools/wada/`. `tools/buch_importieren.py` erzeugt daraus
   `lichtstimmung_buch.jinja`.
 
-## Raum-Layout
+## Weitere Lampen
 
-Wie du mir dein Zimmer mit den Lampen schickst, steht in
+Neue Lampe: in `lichtstimmung.jinja` unter `LAMPEN` an der passenden Stelle im
+Raum eintragen. Wie man die Entity-IDs ausliest, steht in
 [`docs/raum-layout.md`](docs/raum-layout.md).

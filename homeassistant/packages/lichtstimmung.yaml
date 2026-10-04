@@ -110,10 +110,11 @@ template:
       - name: Lichtstimmung Blitze aktiv
         unique_id: lichtstimmung_blitze_aktiv
         icon: mdi:weather-lightning
+        # An, solange ein Modus mit Blitzen läuft und eine Blitz-Lampe an ist.
         state: >
-          {% from 'lichtstimmung.jinja' import effekt %}
+          {% from 'lichtstimmung.jinja' import effekt, blitz_kandidaten %}
           {{ is_state('input_boolean.lichtstimmung_effekte', 'on')
-             and (state_attr('sensor.lichtstimmung_lampen_an', 'an') or []) | count > 0
+             and blitz_kandidaten() | from_json | count > 0
              and effekt(states('sensor.lichtstimmung_zustand')) | trim == 'blitze' }}
 
 # -----------------------------------------------------------------------------
@@ -702,7 +703,8 @@ automation:
     alias: Lichtstimmung – Gewitter-Blitze
     description: >
       Solange ein Modus mit effekt 'blitze' aktiv ist und der Schalter
-      „Gewitter-Blitze“ an ist, blitzen ab und zu ein bis zwei Lampen auf.
+      „Gewitter-Blitze“ an ist, blitzen ab und zu ein bis zwei Lampen auf
+      (nur Lampen mit 'blitz': true in lichtstimmung.jinja).
     mode: single
     max_exceeded: silent
     triggers:
@@ -730,7 +732,9 @@ automation:
                   state: "on"
               then:
                 - variables:
-                    kandidaten: "{{ state_attr('sensor.lichtstimmung_lampen_an', 'an') or [] }}"
+                    kandidaten: >
+                      {% from 'lichtstimmung.jinja' import blitz_kandidaten %}
+                      {{ blitz_kandidaten() | from_json }}
                     ziele: >
                       {% set a = kandidaten | random %}
                       {% set rest = kandidaten | reject('eq', a) | list %}

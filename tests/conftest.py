@@ -13,18 +13,35 @@ JINJA = REPO / "homeassistant" / "custom_templates" / "lichtstimmung.jinja"
 JINJA_BUCH = REPO / "homeassistant" / "custom_templates" / "lichtstimmung_buch.jinja"
 PACKAGE = REPO / "homeassistant" / "packages" / "lichtstimmung.yaml"
 
+# Deine Lampen (siehe lichtstimmung.jinja), simuliert als Farblampen.
 LAMPEN = [
-    {"name": "Deckenlampe", "modi": ["hs", "color_temp"]},
-    {"name": "Stehlampe", "modi": ["hs"]},
-    {"name": "LED-Streifen", "modi": ["hs"]},
-    {"name": "Nachttischlampe", "modi": ["color_temp"]},
+    {"name": "Hue Play Kommode", "modi": ["hs", "color_temp"]},
+    {"name": "TV Backlight", "modi": ["hs", "color_temp"]},
+    {"name": "Kommode Unterbeleuchtung", "modi": ["hs", "color_temp"]},
+    {"name": "Regal rechts unten", "modi": ["hs", "color_temp"]},
+    {"name": "Regal rechts oben", "modi": ["hs", "color_temp"]},
+    {"name": "Govee Floor Lamp", "modi": ["hs", "color_temp"]},
+    {"name": "Hue Play Treppenregal", "modi": ["hs", "color_temp"]},
+    {"name": "Hue Regal rechts", "modi": ["hs", "color_temp"]},
+    {"name": "Hue Regal links", "modi": ["hs", "color_temp"]},
 ]
 LAMPEN_IDS = [
-    "light.deckenlampe",
-    "light.stehlampe",
-    "light.led_streifen",
-    "light.nachttischlampe",
+    "light.hue_play_kommode",
+    "light.tv_backlight",
+    "light.kommode_unterbeleuchtung",
+    "light.regal_rechts_unten",
+    "light.regal_rechts_oben",
+    "light.govee_floor_lamp",
+    "light.hue_play_treppenregal",
+    "light.hue_regal_rechts",
+    "light.hue_regal_links",
 ]
+BLITZ_LAMPEN = {
+    "light.hue_play_kommode",
+    "light.hue_play_treppenregal",
+    "light.hue_regal_rechts",
+    "light.hue_regal_links",
+}
 
 
 @pytest.fixture(autouse=True)
