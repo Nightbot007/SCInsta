@@ -1,0 +1,286 @@
+{#- =========================================================================
+  LICHTSTIMMUNG – Lampen, Modi und Farblogik
+
+  Ablage in Home Assistant:  /config/custom_templates/lichtstimmung.jinja
+  Nach jeder Änderung:       Skript „Lichtstimmung – Konfiguration neu laden“
+                             ausführen (oder Home Assistant neu starten).
+
+  Konfiguriert wird nur in den Abschnitten 1) LAMPEN und 2) MODI.
+  Alles darunter ist Logik und muss normalerweise nicht angefasst werden.
+========================================================================= -#}
+
+{#- -------------------------------------------------------------------------
+  1) LAMPEN
+  Reihenfolge = Position im Raum, einmal rundherum (z. B. im Uhrzeigersinn
+  ab der Tür). Nebeneinander liegende Lampen bekommen benachbarte Farben aus
+  der Palette – so entsteht ein harmonischer Verlauf durch den Raum.
+
+  typ: frei wählbar; wird bei den Modi unter 'hell' (Helligkeit je Typ) und
+       optional 'typ_farben' verwendet. Vorschläge:
+       decke, steh, streifen, nacht, tisch, spot
+
+  Ob eine Lampe Farbe, nur Weiß (Farbtemperatur) oder nur Helligkeit kann,
+  erkennt Home Assistant selbst – das muss hier nicht eingetragen werden.
+------------------------------------------------------------------------- -#}
+{%- set LAMPEN = [
+  {'id': 'light.deckenlampe',     'typ': 'decke'},
+  {'id': 'light.stehlampe',       'typ': 'steh'},
+  {'id': 'light.led_streifen',    'typ': 'streifen'},
+  {'id': 'light.nachttischlampe', 'typ': 'nacht'},
+] -%}
+
+{#- -------------------------------------------------------------------------
+  2) MODI
+  farben      Palette als [Farbton 0–360, Sättigung 0–100].
+              Farbton: 0 Rot · 30 Orange · 60 Gelb · 120 Grün · 180 Cyan
+                       220 Blau · 270 Violett · 300 Magenta · 330 Pink
+              Reihenfolge = Farbverlauf durch den Raum. Mindestens 3 Farben,
+              damit nie alle Lampen gleich aussehen.
+  hell        Helligkeit in % je Lampentyp, 0 = Lampe bleibt aus.
+              'standard' gilt für alle Typen ohne eigenen Eintrag.
+  kelvin      Farbtemperatur für Lampen, die nur Weiß können.
+  streuung    Zufällige Abweichung des Farbtons in Grad (±). Dadurch sieht
+              jede Aktivierung etwas anders aus – Lieblingsvarianten kann man
+              als Favorit speichern.
+  uebergang   Überblendzeit in Sekunden.
+  typ_farben  (optional) eigene Palette für einen Lampentyp,
+              z. B. die Nachttischlampe immer warm.
+  effekt      (optional) 'blitze' = gelegentliche Blitze (Gewitter).
+  aktiv       false = Modus ist vorbereitet, aber nicht in der Auswahl.
+
+  Neuer Modus: Block kopieren, Namen ändern, Farben anpassen, fertig.
+------------------------------------------------------------------------- -#}
+{%- set MODI = {
+  'Cozy': {
+    'aktiv': true,
+    'farben': [[38, 70], [30, 88], [22, 92], [12, 80], [45, 60]],
+    'hell': {'standard': 45, 'decke': 20, 'steh': 60, 'streifen': 40, 'nacht': 35},
+    'kelvin': 2200,
+    'streuung': 5,
+    'uebergang': 2,
+  },
+  'Cyberpunk': {
+    'aktiv': true,
+    'farben': [[325, 100], [300, 100], [275, 100], [230, 100], [190, 100]],
+    'hell': {'standard': 60, 'decke': 25, 'steh': 70, 'streifen': 85, 'nacht': 45},
+    'kelvin': 6500,
+    'streuung': 8,
+    'uebergang': 1,
+  },
+  'Ruhig': {
+    'aktiv': true,
+    'farben': [[200, 45], [220, 40], [250, 35], [175, 35]],
+    'typ_farben': {'nacht': [[32, 55], [26, 60]]},
+    'hell': {'standard': 30, 'decke': 10, 'steh': 35, 'streifen': 20, 'nacht': 25},
+    'kelvin': 2700,
+    'streuung': 4,
+    'uebergang': 4,
+  },
+  'Regen / Gewitter': {
+    'aktiv': true,
+    'farben': [[215, 90], [228, 85], [245, 80], [200, 70], [260, 70]],
+    'hell': {'standard': 30, 'decke': 0, 'steh': 35, 'streifen': 40, 'nacht': 20},
+    'kelvin': 5000,
+    'streuung': 6,
+    'uebergang': 3,
+    'effekt': 'blitze',
+  },
+
+  'Sonnenuntergang': {
+    'aktiv': false,
+    'farben': [[350, 85], [10, 90], [25, 95], [40, 85], [300, 55]],
+    'hell': {'standard': 50, 'decke': 20, 'streifen': 60, 'nacht': 35},
+    'kelvin': 2300,
+    'streuung': 6,
+    'uebergang': 3,
+  },
+  'Nordlicht': {
+    'aktiv': false,
+    'farben': [[150, 90], [165, 85], [180, 70], [280, 65], [130, 75]],
+    'hell': {'standard': 45, 'decke': 15, 'streifen': 60, 'nacht': 30},
+    'kelvin': 5500,
+    'streuung': 8,
+    'uebergang': 3,
+  },
+  'Ozean': {
+    'aktiv': false,
+    'farben': [[190, 90], [205, 85], [175, 80], [220, 75], [160, 60]],
+    'hell': {'standard': 45, 'decke': 20, 'streifen': 55, 'nacht': 30},
+    'kelvin': 6000,
+    'streuung': 6,
+    'uebergang': 3,
+  },
+  'Wald': {
+    'aktiv': false,
+    'farben': [[95, 70], [120, 65], [140, 60], [70, 70], [40, 55]],
+    'hell': {'standard': 45, 'decke': 20, 'streifen': 50, 'nacht': 30},
+    'kelvin': 3000,
+    'streuung': 6,
+    'uebergang': 3,
+  },
+} -%}
+
+{#- =========================================================================
+  AB HIER: LOGIK
+========================================================================= -#}
+
+{%- set FARBMODI = ['hs', 'rgb', 'rgbw', 'rgbww', 'xy'] -%}
+{%- set FAVORIT = '★ ' -%}
+
+{#- Alle Lampen-IDs (JSON-Liste) -#}
+{%- macro lampen_ids() -%}
+{{- LAMPEN | map(attribute='id') | list | to_json -}}
+{%- endmacro -%}
+
+{#- Lampen, die gerade an sind (JSON-Liste) -#}
+{%- macro lampen_an() -%}
+{%- set ns = namespace(l=[]) -%}
+{%- for l in LAMPEN if is_state(l.id, 'on') -%}
+  {%- set ns.l = ns.l + [l.id] -%}
+{%- endfor -%}
+{{- ns.l | to_json -}}
+{%- endmacro -%}
+
+{#- Namen aller aktiven Modi in der festgelegten Reihenfolge (JSON-Liste) -#}
+{%- macro modi_namen() -%}
+{%- set ns = namespace(l=[]) -%}
+{%- for name, m in MODI.items() if m.get('aktiv', true) -%}
+  {%- set ns.l = ns.l + [name] -%}
+{%- endfor -%}
+{{- ns.l | to_json -}}
+{%- endmacro -%}
+
+{#- Gespeicherter Favorit zu „★ Name“ (Dict) oder {} -#}
+{%- macro _favorit(modus) -%}
+{%- set alle = state_attr('sensor.lichtstimmung_favoriten', 'favoriten') -%}
+{%- set name = modus[FAVORIT | length:] if modus is string and modus.startswith(FAVORIT) else none -%}
+{{- ((alle.get(name) if alle is mapping and name else none) or {}) | to_json -}}
+{%- endmacro -%}
+
+{#- Grundmodus: bei Favoriten der Modus, aus dem sie gespeichert wurden -#}
+{%- macro basis(modus) -%}
+{%- if modus is string and modus.startswith(FAVORIT) -%}
+  {{- (_favorit(modus) | from_json).get('basis', '') -}}
+{%- else -%}
+  {{- modus -}}
+{%- endif -%}
+{%- endmacro -%}
+
+{#- Effekt des (Grund-)Modus, z. B. 'blitze', sonst leer -#}
+{%- macro effekt(modus) -%}
+{{- MODI.get(basis(modus), {}).get('effekt', '') -}}
+{%- endmacro -%}
+
+{#- Überblendzeit in Sekunden -#}
+{%- macro uebergang(modus) -%}
+{{- MODI.get(basis(modus), {}).get('uebergang', 1.5) -}}
+{%- endmacro -%}
+
+{#- -------------------------------------------------------------------------
+  Farbzuweisung für einen Modus (JSON-Dict: Lampe -> Wert)
+  Wert: {'an': false}
+        {'an': true, 'hs': [Farbton, Sättigung], 'hell': %}   Farblampen
+        {'an': true, 'kelvin': K, 'hell': %}                  Weiß-Lampen
+        {'an': true, 'hell': %}                               nur Helligkeit
+  Jede Aktivierung dreht die Palette zufällig weiter, wählt zufällig die
+  Laufrichtung und streut den Farbton leicht – Nachbarn bleiben harmonisch.
+------------------------------------------------------------------------- -#}
+{%- macro zuweisung(modus) -%}
+{%- set ns = namespace(out={}) -%}
+{%- if modus is string and modus.startswith(FAVORIT) -%}
+  {%- set werte = (_favorit(modus) | from_json).get('lampen', {}) -%}
+  {%- for l in LAMPEN if l.id in werte -%}
+    {%- set ns.out = dict(ns.out, **{l.id: werte[l.id]}) -%}
+  {%- endfor -%}
+{%- elif modus in MODI -%}
+  {%- set m = MODI[modus] -%}
+  {%- set versatz = range(100) | random -%}
+  {%- set richtung = [1, -1] | random -%}
+  {%- set s = m.get('streuung', 5) | int -%}
+  {%- for l in LAMPEN -%}
+    {%- set palette = m.get('typ_farben', {}).get(l.typ, m.farben) -%}
+    {%- set f = palette[(versatz + richtung * loop.index0) % (palette | count)] -%}
+    {%- set hell = m.hell.get(l.typ, m.hell.get('standard', 50)) | int -%}
+    {%- set modi = state_attr(l.id, 'supported_color_modes') or [] -%}
+    {%- if hell <= 0 -%}
+      {%- set w = {'an': false} -%}
+    {%- elif modi | select('in', FARBMODI) | list | count > 0 -%}
+      {%- set farbton = (f[0] + (range(-s, s + 1) | random)) % 360 -%}
+      {%- set saettigung = [[f[1] + (range(-4, 5) | random), 0] | max, 100] | min -%}
+      {%- set w = {'an': true, 'hs': [farbton, saettigung], 'hell': hell} -%}
+    {%- elif 'color_temp' in modi -%}
+      {%- set w = {'an': true, 'kelvin': m.get('kelvin', 2700), 'hell': hell} -%}
+    {%- else -%}
+      {%- set w = {'an': true, 'hell': hell} -%}
+    {%- endif -%}
+    {%- set ns.out = dict(ns.out, **{l.id: w}) -%}
+  {%- endfor -%}
+{%- endif -%}
+{{- ns.out | to_json -}}
+{%- endmacro -%}
+
+{#- Aktueller Zustand aller Lampen wie zuweisung(), Helligkeit aber exakt als 'bri' (1–255) -#}
+{%- macro momentaufnahme() -%}
+{%- set ns = namespace(out={}) -%}
+{%- for l in LAMPEN -%}
+  {%- if is_state(l.id, 'on') -%}
+    {%- set bri = [state_attr(l.id, 'brightness') | int(255), 1] | max -%}
+    {%- set cm = state_attr(l.id, 'color_mode') -%}
+    {%- set hs = state_attr(l.id, 'hs_color') -%}
+    {%- set k = state_attr(l.id, 'color_temp_kelvin') -%}
+    {%- if cm in FARBMODI and hs -%}
+      {%- set w = {'an': true, 'hs': [hs[0] | round(1), hs[1] | round(1)], 'bri': bri} -%}
+    {%- elif cm == 'color_temp' and k -%}
+      {%- set w = {'an': true, 'kelvin': k | int, 'bri': bri} -%}
+    {%- else -%}
+      {%- set w = {'an': true, 'bri': bri} -%}
+    {%- endif -%}
+  {%- else -%}
+    {%- set w = {'an': false} -%}
+  {%- endif -%}
+  {%- set ns.out = dict(ns.out, **{l.id: w}) -%}
+{%- endfor -%}
+{{- ns.out | to_json -}}
+{%- endmacro -%}
+
+{#- Favoritenliste nach Speichern/Löschen (für sensor.lichtstimmung_favoriten) -#}
+{%- macro favoriten_neu(alt, d) -%}
+{%- set alt = alt if alt is mapping else {} -%}
+{%- set name = (d.get('name') or '') | string | trim -%}
+{%- if d.get('aktion') == 'speichern' and name -%}
+  {{- dict(alt, **{name: {'basis': d.get('basis', ''), 'lampen': d.get('lampen', {})}}) | to_json -}}
+{%- elif d.get('aktion') == 'loeschen' -%}
+  {%- set ns = namespace(out={}) -%}
+  {%- for k, v in alt.items() if k != name -%}
+    {%- set ns.out = dict(ns.out, **{k: v}) -%}
+  {%- endfor -%}
+  {{- ns.out | to_json -}}
+{%- else -%}
+  {{- alt | to_json -}}
+{%- endif -%}
+{%- endmacro -%}
+
+{#- -------------------------------------------------------------------------
+  Konfigurations-Check – in Entwicklerwerkzeuge → Template einfügen:
+    {% from 'lichtstimmung.jinja' import pruefen %}{{ pruefen() }}
+------------------------------------------------------------------------- -#}
+{%- macro pruefen() -%}
+LAMPEN ({{ LAMPEN | count }})
+{%- for l in LAMPEN %}
+{%- set modi = state_attr(l.id, 'supported_color_modes') or [] %}
+- {{ l.id }} [{{ l.typ }}]:
+{%- if expand(l.id) | count == 0 %} ❌ nicht gefunden – Entity-ID prüfen
+{%- else %} {{ states(l.id) }} · {{ 'Farbe' if modi | select('in', FARBMODI) | list | count > 0 else ('nur Weiß (Kelvin)' if 'color_temp' in modi else 'nur Helligkeit') }}
+{%- endif %}
+{%- endfor %}
+
+MODI
+{%- for name, m in MODI.items() %}
+{%- set typen = LAMPEN | map(attribute='typ') | unique | list %}
+{%- set ohne_hell = typen | reject('in', m.get('hell', {}).keys() | list) | list %}
+- {{ name }}{{ '' if m.get('aktiv', true) else ' (inaktiv)' }}: {{ m.get('farben', []) | count }} Farben
+{%- if m.get('farben', []) | count < 3 %} ⚠️ weniger als 3 Farben{% endif %}
+{%- if ohne_hell and 'standard' not in m.get('hell', {}) %} ⚠️ keine Helligkeit für: {{ ohne_hell | join(', ') }}{% endif %}
+{%- if name.startswith(FAVORIT) %} ⚠️ Name darf nicht mit „★“ beginnen{% endif %}
+{%- endfor %}
+{%- endmacro -%}

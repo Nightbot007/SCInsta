@@ -1,0 +1,748 @@
+# =============================================================================
+#  LICHTSTIMMUNG – Home-Assistant-Package
+#
+#  Ablage:  /config/packages/lichtstimmung.yaml
+#  Lampen & Farbmodi werden NICHT hier, sondern in
+#           /config/custom_templates/lichtstimmung.jinja
+#  eingetragen. Hier steckt nur die Logik.
+#
+#  Einzige Stelle, die du hier anpassen musst: die Taste (ganz unten bei
+#  der Automation „Lichtstimmung – Taste gedrückt“).
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+#  Helfer
+# -----------------------------------------------------------------------------
+input_select:
+  lichtstimmung_modus:
+    name: Lichtstimmung
+    icon: mdi:palette
+    # Wird beim Start automatisch mit den Modi aus lichtstimmung.jinja und den
+    # gespeicherten Favoriten (★) abgeglichen – hier nichts eintragen.
+    options:
+      - Cozy
+
+input_boolean:
+  lichtstimmung_wechsel_faellig:
+    name: Lichtstimmung – Wechsel beim nächsten Einschalten
+    icon: mdi:swap-horizontal
+  lichtstimmung_zufall:
+    name: Lichtstimmung – Zufällige Reihenfolge
+    icon: mdi:shuffle-variant
+  lichtstimmung_favoriten_im_wechsel:
+    name: Lichtstimmung – Favoriten im Wechsel
+    icon: mdi:star-cog
+  lichtstimmung_effekte:
+    name: Lichtstimmung – Gewitter-Blitze
+    icon: mdi:weather-lightning
+
+input_text:
+  lichtstimmung_favorit_name:
+    name: Lichtstimmung – Name für Favorit
+    icon: mdi:star-plus
+    max: 40
+
+input_button:
+  lichtstimmung_taste:
+    name: Lichtstimmung – Taste (an/aus)
+    icon: mdi:lightbulb-group
+
+# -----------------------------------------------------------------------------
+#  Template-Entitäten
+# -----------------------------------------------------------------------------
+template:
+  # Speicher: welcher Modus aktiv ist und welche Lampe welche Farbe hat.
+  # Trigger-basierte Template-Sensoren behalten Zustand + Attribute über
+  # Neustarts hinweg.
+  - triggers:
+      - trigger: event
+        event_type: lichtstimmung_zustand
+    sensor:
+      - name: Lichtstimmung Zustand
+        unique_id: lichtstimmung_zustand
+        icon: mdi:palette
+        state: >
+          {{ trigger.event.data.modus if 'modus' in trigger.event.data else this.state }}
+        attributes:
+          zuweisung: >
+            {{ trigger.event.data.zuweisung if 'zuweisung' in trigger.event.data
+               else this.attributes.get('zuweisung', {}) }}
+          offen: >
+            {{ trigger.event.data.offen if 'offen' in trigger.event.data
+               else this.attributes.get('offen', []) }}
+          stand: >
+            {{ trigger.event.data.stand if 'stand' in trigger.event.data
+               else this.attributes.get('stand', '') }}
+
+  # Speicher für Favoriten (gespeicherte Farbkombinationen).
+  - triggers:
+      - trigger: event
+        event_type: lichtstimmung_favoriten
+    sensor:
+      - name: Lichtstimmung Favoriten
+        unique_id: lichtstimmung_favoriten
+        icon: mdi:star
+        state: >
+          {% from 'lichtstimmung.jinja' import favoriten_neu %}
+          {{ favoriten_neu(this.attributes.get('favoriten', {}), trigger.event.data) | from_json | count }}
+        attributes:
+          favoriten: >
+            {% from 'lichtstimmung.jinja' import favoriten_neu %}
+            {{ favoriten_neu(this.attributes.get('favoriten', {}), trigger.event.data) | from_json }}
+
+  - sensor:
+      # Anzahl eingeschalteter Lampen; Attribut „an“ = welche.
+      - name: Lichtstimmung Lampen an
+        unique_id: lichtstimmung_lampen_an
+        icon: mdi:lightbulb-group
+        state: >
+          {% from 'lichtstimmung.jinja' import lampen_an %}
+          {{ lampen_an() | from_json | count }}
+        attributes:
+          an: >
+            {% from 'lichtstimmung.jinja' import lampen_an %}
+            {{ lampen_an() | from_json }}
+  - binary_sensor:
+      - name: Lichtstimmung Blitze aktiv
+        unique_id: lichtstimmung_blitze_aktiv
+        icon: mdi:weather-lightning
+        state: >
+          {% from 'lichtstimmung.jinja' import effekt %}
+          {{ is_state('input_boolean.lichtstimmung_effekte', 'on')
+             and (state_attr('sensor.lichtstimmung_lampen_an', 'an') or []) | count > 0
+             and effekt(states('sensor.lichtstimmung_zustand')) | trim == 'blitze' }}
+
+# -----------------------------------------------------------------------------
+#  Skripte
+# -----------------------------------------------------------------------------
+script:
+  lichtstimmung_taste:
+    alias: Lichtstimmung – Taste (alles an/aus)
+    description: >
+      Ist irgendeine Lampe an, geht alles aus (und der Modus wechselt beim
+      nächsten Einschalten). Ist alles aus, geht alles an.
+    icon: mdi:lightbulb-group
+    mode: queued
+    max: 3
+    sequence:
+      - if:
+          - condition: template
+            value_template: >
+              {% from 'lichtstimmung.jinja' import lampen_an %}
+              {{ lampen_an() | from_json | count > 0 }}
+        then:
+          - action: script.lichtstimmung_alles_aus
+        else:
+          - action: script.lichtstimmung_alles_an
+
+  lichtstimmung_alles_aus:
+    alias: Lichtstimmung – Alles aus
+    description: Schaltet alle Lampen aus. Beim nächsten Einschalten wechselt der Modus.
+    icon: mdi:lightbulb-group-off
+    mode: queued
+    sequence:
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.lichtstimmung_wechsel_faellig
+      - action: light.turn_off
+        target:
+          entity_id: >
+            {% from 'lichtstimmung.jinja' import lampen_ids %}
+            {{ lampen_ids() | from_json }}
+        data:
+          transition: 1
+
+  lichtstimmung_alles_an:
+    alias: Lichtstimmung – Alles an
+    description: >
+      Schaltet alle Lampen der Stimmung ein. Wurde vorher über die Taste alles
+      ausgeschaltet, kommt dabei der nächste Modus.
+    icon: mdi:lightbulb-group
+    mode: queued
+    sequence:
+      - if:
+          - condition: state
+            entity_id: input_boolean.lichtstimmung_wechsel_faellig
+            state: "on"
+        then:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.lichtstimmung_wechsel_faellig
+          - action: script.lichtstimmung_naechster_modus
+            data:
+              einschalten: true
+        else:
+          - action: script.lichtstimmung_anwenden
+            data:
+              einschalten: true
+              neu: false
+
+  lichtstimmung_naechster_modus:
+    alias: Lichtstimmung – Nächster Modus
+    icon: mdi:skip-next
+    mode: queued
+    fields:
+      einschalten:
+        name: Alle Lampen einschalten
+        description: An = alle Lampen der Stimmung einschalten, Aus = nur die eingeschalteten umfärben.
+        default: false
+        selector:
+          boolean:
+    sequence:
+      - variables:
+          optionen: "{{ state_attr('input_select.lichtstimmung_modus', 'options') or [] }}"
+          aktuell: "{{ states('input_select.lichtstimmung_modus') }}"
+          kandidaten: >
+            {% if is_state('input_boolean.lichtstimmung_favoriten_im_wechsel', 'on') %}
+              {{ optionen }}
+            {% else %}
+              {{ optionen | reject('search', '^★') | list }}
+            {% endif %}
+          ziel: >
+            {% if kandidaten | count == 0 %}
+              {{ aktuell }}
+            {% elif is_state('input_boolean.lichtstimmung_zufall', 'on') and kandidaten | count > 1 %}
+              {{ kandidaten | reject('eq', aktuell) | list | random }}
+            {% else %}
+              {% set n = optionen | count %}
+              {% set i = optionen.index(aktuell) if aktuell in optionen else -1 %}
+              {% set ns = namespace(r=none) %}
+              {% for j in range(1, n + 1) %}
+                {% set o = optionen[(i + j) % n] %}
+                {% if ns.r is none and o in kandidaten %}{% set ns.r = o %}{% endif %}
+              {% endfor %}
+              {{ ns.r if ns.r is not none else kandidaten[0] }}
+            {% endif %}
+      - action: script.lichtstimmung_anwenden
+        data:
+          modus: "{{ ziel }}"
+          einschalten: "{{ einschalten | default(false) }}"
+
+  lichtstimmung_neu_wuerfeln:
+    alias: Lichtstimmung – Neu würfeln
+    description: Gleicher Modus, neue Farbverteilung.
+    icon: mdi:dice-multiple
+    mode: queued
+    sequence:
+      - action: script.lichtstimmung_anwenden
+        data:
+          neu: true
+
+  lichtstimmung_anwenden:
+    alias: Lichtstimmung – Modus anwenden
+    description: >
+      Berechnet die Farben für einen Modus (oder lädt einen ★ Favoriten) und
+      setzt sie. Lampen, die gerade aus sind, bekommen ihre Farbe, sobald sie
+      eingeschaltet werden.
+    icon: mdi:palette
+    mode: queued
+    max: 10
+    fields:
+      modus:
+        name: Modus
+        description: Name des Modus oder „★ Favorit“. Leer = aktuell gewählter Modus.
+        example: Cozy
+        selector:
+          text:
+      einschalten:
+        name: Alle Lampen einschalten
+        description: An = alle Lampen der Stimmung einschalten, Aus = nur die eingeschalteten umfärben.
+        default: false
+        selector:
+          boolean:
+      neu:
+        name: Neu würfeln
+        description: An = neue Farbverteilung, Aus = letzte Verteilung dieses Modus wiederverwenden.
+        default: true
+        selector:
+          boolean:
+    sequence:
+      - variables:
+          ziel: >
+            {{ modus if modus is defined and modus else states('input_select.lichtstimmung_modus') }}
+          alles_an: "{{ einschalten | default(false) | bool }}"
+          neu_wuerfeln: "{{ neu | default(true) | bool }}"
+          frisch: >
+            {% from 'lichtstimmung.jinja' import zuweisung %}
+            {{ zuweisung(ziel) | from_json }}
+          plan: >
+            {% set alt = state_attr('sensor.lichtstimmung_zustand', 'zuweisung') %}
+            {% if not neu_wuerfeln and states('sensor.lichtstimmung_zustand') == ziel and alt is mapping %}
+              {% set ns = namespace(out={}) %}
+              {% for id, w in frisch.items() %}
+                {% set ns.out = dict(ns.out, **{id: alt.get(id, w)}) %}
+              {% endfor %}
+              {{ ns.out }}
+            {% else %}
+              {{ frisch }}
+            {% endif %}
+          jetzt: >
+            {% set ns = namespace(l=[]) %}
+            {% for id, w in plan.items() %}
+              {% if (alles_an and w.an) or is_state(id, 'on') %}{% set ns.l = ns.l + [id] %}{% endif %}
+            {% endfor %}
+            {{ ns.l }}
+          offen: >
+            {% set ns = namespace(l=[]) %}
+            {% for id, w in plan.items() %}
+              {% if w.an and id not in jetzt %}{% set ns.l = ns.l + [id] %}{% endif %}
+            {% endfor %}
+            {{ ns.l }}
+          uebergang: >
+            {% from 'lichtstimmung.jinja' import uebergang %}
+            {{ uebergang(ziel) | float(1.5) }}
+          stand: "{{ now().isoformat() }}"
+      - if: "{{ plan | count == 0 }}"
+        then:
+          - action: persistent_notification.create
+            data:
+              notification_id: lichtstimmung
+              title: Lichtstimmung
+              message: >
+                Für „{{ ziel }}“ gibt es keine Farben. Stimmt der Name? Sind in
+                lichtstimmung.jinja Lampen eingetragen?
+          - stop: Unbekannter Modus
+      # Erst merken, dann schalten – so weiß die Automation „Lampe
+      # eingeschaltet“ immer, welche Lampen noch auf ihre Farbe warten.
+      - event: lichtstimmung_zustand
+        event_data:
+          modus: "{{ ziel }}"
+          zuweisung: "{{ plan }}"
+          offen: "{{ offen }}"
+          stand: "{{ stand }}"
+      - wait_template: "{{ state_attr('sensor.lichtstimmung_zustand', 'stand') == stand }}"
+        timeout: 2
+      - if: >
+          {{ ziel in (state_attr('input_select.lichtstimmung_modus', 'options') or [])
+             and not is_state('input_select.lichtstimmung_modus', ziel) }}
+        then:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.lichtstimmung_modus
+            data:
+              option: "{{ ziel }}"
+      # Alle Lampen gleichzeitig (parallel) schalten.
+      - repeat:
+          for_each: "{{ jetzt }}"
+          sequence:
+            - action: script.turn_on
+              target:
+                entity_id: script.lichtstimmung_lampe_setzen
+              data:
+                variables:
+                  lampe: "{{ repeat.item }}"
+                  wert: "{{ plan[repeat.item] }}"
+                  uebergang: "{{ uebergang }}"
+
+  lichtstimmung_lampe_setzen:
+    alias: Lichtstimmung – Lampe setzen (intern)
+    icon: mdi:lightbulb-auto
+    mode: parallel
+    max: 50
+    fields:
+      lampe:
+        name: Lampe
+        selector:
+          entity:
+            domain: light
+      wert:
+        name: Wert
+        description: "z. B. {'an': true, 'hs': [30, 80], 'hell': 50} – hell in %, alternativ bri 1–255"
+        selector:
+          object:
+      uebergang:
+        name: Übergang (s)
+        selector:
+          number:
+            min: 0
+            max: 30
+            step: 0.5
+    sequence:
+      - variables:
+          t: "{{ uebergang | default(1) | float(1) }}"
+          # 'hell' = Prozent (Modi), 'bri' = exakter Wert 1–255 (Favoriten)
+          helligkeit: >
+            {{ wert.bri if wert.bri is defined else ((wert.hell | default(100)) * 2.55) | round(0) | int }}
+      - choose:
+          - conditions: "{{ not wert.an }}"
+            sequence:
+              - action: light.turn_off
+                target:
+                  entity_id: "{{ lampe }}"
+                data:
+                  transition: "{{ t }}"
+          - conditions: "{{ wert.hs is defined }}"
+            sequence:
+              - action: light.turn_on
+                target:
+                  entity_id: "{{ lampe }}"
+                data:
+                  hs_color: "{{ wert.hs }}"
+                  brightness: "{{ helligkeit }}"
+                  transition: "{{ t }}"
+          - conditions: "{{ wert.kelvin is defined }}"
+            sequence:
+              - action: light.turn_on
+                target:
+                  entity_id: "{{ lampe }}"
+                data:
+                  color_temp_kelvin: "{{ wert.kelvin }}"
+                  brightness: "{{ helligkeit }}"
+                  transition: "{{ t }}"
+        default:
+          - action: light.turn_on
+            target:
+              entity_id: "{{ lampe }}"
+            data:
+              brightness: "{{ helligkeit }}"
+              transition: "{{ t }}"
+
+  lichtstimmung_favorit_speichern:
+    alias: Lichtstimmung – Aktuelle Farben als Favorit speichern
+    description: >
+      Speichert die aktuellen Farben aller Lampen. Name aus dem Textfeld
+      „Name für Favorit“ – leer = automatischer Name mit Datum.
+    icon: mdi:star-plus
+    mode: queued
+    fields:
+      name:
+        name: Name
+        description: Optional, sonst wird das Textfeld bzw. ein automatischer Name verwendet.
+        example: Abendrot
+        selector:
+          text:
+    sequence:
+      - variables:
+          aktuell: "{{ states('input_select.lichtstimmung_modus') }}"
+          basis_modus: >
+            {% from 'lichtstimmung.jinja' import basis %}
+            {{ basis(aktuell) | trim }}
+          eingabe: >
+            {{ (name if name is defined and name else states('input_text.lichtstimmung_favorit_name'))
+               | string | replace('★', '') | trim }}
+          fav_name: >
+            {% if eingabe and eingabe not in ['unknown', 'unavailable'] %}
+              {{ eingabe }}
+            {% else %}
+              {{ (basis_modus or 'Favorit') ~ ' ' ~ now().strftime('%d.%m. %H:%M') }}
+            {% endif %}
+          werte: >
+            {% from 'lichtstimmung.jinja' import momentaufnahme %}
+            {{ momentaufnahme() | from_json }}
+      - if: "{{ werte.values() | selectattr('an') | list | count == 0 }}"
+        then:
+          - action: persistent_notification.create
+            data:
+              notification_id: lichtstimmung
+              title: Lichtstimmung
+              message: Es ist keine Lampe an – es wurde nichts gespeichert.
+          - stop: Keine Lampe an
+      - event: lichtstimmung_favoriten
+        event_data:
+          aktion: speichern
+          name: "{{ fav_name }}"
+          basis: "{{ basis_modus }}"
+          lampen: "{{ werte }}"
+      # Warten, bis der Favorit in der Modus-Auswahl auftaucht, dann auswählen.
+      - wait_template: >
+          {{ ('★ ' ~ fav_name) in (state_attr('input_select.lichtstimmung_modus', 'options') or []) }}
+        timeout: 5
+      - action: script.lichtstimmung_anwenden
+        data:
+          modus: "★ {{ fav_name }}"
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.lichtstimmung_favorit_name
+        data:
+          value: ""
+
+  lichtstimmung_favorit_loeschen:
+    alias: Lichtstimmung – Favorit löschen
+    description: >
+      Löscht den Favoriten aus dem Textfeld „Name für Favorit“ – oder, wenn das
+      leer ist, den gerade gewählten ★ Favoriten.
+    icon: mdi:star-remove
+    mode: queued
+    fields:
+      name:
+        name: Name
+        example: Abendrot
+        selector:
+          text:
+    sequence:
+      - variables:
+          aktuell: "{{ states('input_select.lichtstimmung_modus') }}"
+          eingabe: >
+            {{ (name if name is defined and name else states('input_text.lichtstimmung_favorit_name'))
+               | string | replace('★', '') | trim }}
+          fav_name: >
+            {% if eingabe and eingabe not in ['unknown', 'unavailable'] %}
+              {{ eingabe }}
+            {% elif aktuell.startswith('★') %}
+              {{ aktuell[1:] | trim }}
+            {% endif %}
+          favoriten: "{{ state_attr('sensor.lichtstimmung_favoriten', 'favoriten') or {} }}"
+      - if: "{{ fav_name not in favoriten }}"
+        then:
+          - action: persistent_notification.create
+            data:
+              notification_id: lichtstimmung
+              title: Lichtstimmung
+              message: >
+                Kein Favorit „{{ fav_name }}“ gefunden. Favorit auswählen oder
+                Namen ins Feld „Name für Favorit“ schreiben.
+          - stop: Favorit nicht gefunden
+      # Ist der Favorit gerade aktiv, springt die Auswahl auf den ersten Modus –
+      # die Lampen behalten dabei ihre Farben.
+      - if: "{{ aktuell == '★ ' ~ fav_name }}"
+        then:
+          - variables:
+              erster: >
+                {% from 'lichtstimmung.jinja' import modi_namen %}
+                {{ (modi_namen() | from_json)[0] }}
+          - event: lichtstimmung_zustand
+            event_data:
+              modus: "{{ erster }}"
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.lichtstimmung_modus
+            data:
+              option: "{{ erster }}"
+      - event: lichtstimmung_favoriten
+        event_data:
+          aktion: loeschen
+          name: "{{ fav_name }}"
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.lichtstimmung_favorit_name
+        data:
+          value: ""
+
+  lichtstimmung_neu_laden:
+    alias: Lichtstimmung – Konfiguration neu laden
+    description: Nach Änderungen an lichtstimmung.jinja ausführen.
+    icon: mdi:reload
+    mode: single
+    sequence:
+      - action: homeassistant.reload_custom_templates
+      - action: homeassistant.update_entity
+        target:
+          entity_id:
+            - sensor.lichtstimmung_lampen_an
+            - binary_sensor.lichtstimmung_blitze_aktiv
+      - event: lichtstimmung_neu_laden
+
+# -----------------------------------------------------------------------------
+#  Automationen
+# -----------------------------------------------------------------------------
+automation:
+  - id: lichtstimmung_taste
+    alias: Lichtstimmung – Taste gedrückt
+    description: >
+      Verbindet deine Taste mit der Lichtstimmung. Den Auslöser an deine
+      Taste anpassen (Beispiele unten).
+    mode: queued
+    max: 3
+    triggers:
+      # Virtuelle Taste fürs Dashboard (funktioniert sofort).
+      - trigger: state
+        entity_id: input_button.lichtstimmung_taste
+        not_from: unavailable
+      # --- Deine echte Taste: einen passenden Auslöser einkommentieren ---
+      #
+      # Taste als Event-Entität (Hue, Matter, Shelly, neuere Zigbee2MQTT):
+      # - trigger: state
+      #   entity_id: event.DEINE_TASTE
+      #   not_from: unavailable
+      #   (dazu ggf. Bedingung: trigger.to_state.attributes.event_type == 'short_release')
+      #
+      # Zigbee2MQTT mit „action“-Sensor:
+      # - trigger: state
+      #   entity_id: sensor.DEINE_TASTE_action
+      #   to: single
+      #
+      # ZHA:
+      # - trigger: event
+      #   event_type: zha_event
+      #   event_data:
+      #     device_ieee: "00:11:22:33:44:55:66:77"
+      #     command: single
+    actions:
+      - action: script.lichtstimmung_taste
+
+  - id: lichtstimmung_modus_gewaehlt
+    alias: Lichtstimmung – Modus von Hand gewählt
+    description: Wird im Dashboard ein Modus gewählt, sofort anwenden.
+    mode: queued
+    triggers:
+      - trigger: state
+        entity_id: input_select.lichtstimmung_modus
+        not_to:
+          - unavailable
+          - unknown
+    conditions:
+      # Nur reagieren, wenn die Auswahl nicht von den Skripten selbst kommt.
+      - "{{ trigger.to_state.state != states('sensor.lichtstimmung_zustand') }}"
+    actions:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.lichtstimmung_wechsel_faellig
+      - action: script.lichtstimmung_anwenden
+        data:
+          modus: "{{ trigger.to_state.state }}"
+
+  - id: lichtstimmung_lampe_eingeschaltet
+    alias: Lichtstimmung – Lampe eingeschaltet
+    description: >
+      Nach „Alles aus“ über die Taste: Das nächste Einschalten (egal welche
+      Lampe) startet den nächsten Modus. Sonst bekommt eine Lampe, die beim
+      letzten Moduswechsel aus war, beim Einschalten ihre Farbe. Einzelnes
+      An-/Ausschalten ändert den Modus nie.
+    mode: queued
+    max: 30
+    max_exceeded: silent
+    triggers:
+      - trigger: state
+        entity_id: sensor.lichtstimmung_lampen_an
+        attribute: an
+    conditions:
+      - >
+        {{ trigger.from_state is not none and trigger.to_state is not none
+           and trigger.from_state.state not in ['unknown', 'unavailable'] }}
+    actions:
+      - variables:
+          vorher: "{{ trigger.from_state.attributes.get('an') or [] }}"
+          nachher: "{{ trigger.to_state.attributes.get('an') or [] }}"
+          neu_an: "{{ nachher | reject('in', vorher) | list }}"
+      - condition: "{{ neu_an | count > 0 }}"
+      - if:
+          - condition: state
+            entity_id: input_boolean.lichtstimmung_wechsel_faellig
+            state: "on"
+        then:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.lichtstimmung_wechsel_faellig
+          - action: script.lichtstimmung_naechster_modus
+        else:
+          - variables:
+              offen: "{{ state_attr('sensor.lichtstimmung_zustand', 'offen') or [] }}"
+              plan: "{{ state_attr('sensor.lichtstimmung_zustand', 'zuweisung') or {} }}"
+              faellig: "{{ neu_an | select('in', offen) | select('in', plan) | list }}"
+          - condition: "{{ faellig | count > 0 }}"
+          - event: lichtstimmung_zustand
+            event_data:
+              offen: "{{ offen | reject('in', faellig) | list }}"
+          - repeat:
+              for_each: "{{ faellig }}"
+              sequence:
+                - action: script.turn_on
+                  target:
+                    entity_id: script.lichtstimmung_lampe_setzen
+                  data:
+                    variables:
+                      lampe: "{{ repeat.item }}"
+                      wert: "{{ plan[repeat.item] }}"
+                      uebergang: 0.5
+
+  - id: lichtstimmung_modusliste_abgleichen
+    alias: Lichtstimmung – Modusliste abgleichen
+    description: Hält die Auswahl synchron mit lichtstimmung.jinja und den Favoriten.
+    mode: queued
+    triggers:
+      - trigger: homeassistant
+        event: start
+      - trigger: state
+        entity_id: sensor.lichtstimmung_favoriten
+      - trigger: event
+        event_type: lichtstimmung_neu_laden
+    actions:
+      - variables:
+          favoriten: "{{ state_attr('sensor.lichtstimmung_favoriten', 'favoriten') or {} }}"
+          optionen: >
+            {% from 'lichtstimmung.jinja' import modi_namen %}
+            {% set ns = namespace(l=modi_namen() | from_json) %}
+            {% for name in favoriten.keys() | sort %}
+              {% set ns.l = ns.l + ['★ ' ~ name] %}
+            {% endfor %}
+            {{ ns.l }}
+          gespeichert: "{{ states('sensor.lichtstimmung_zustand') }}"
+      - condition: "{{ optionen | count > 0 }}"
+      - if: "{{ optionen != state_attr('input_select.lichtstimmung_modus', 'options') }}"
+        then:
+          - action: input_select.set_options
+            target:
+              entity_id: input_select.lichtstimmung_modus
+            data:
+              options: "{{ optionen }}"
+      # Nach einem Neustart die zuletzt aktive Auswahl wiederherstellen.
+      - if: >
+          {{ gespeichert in optionen
+             and not is_state('input_select.lichtstimmung_modus', gespeichert) }}
+        then:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.lichtstimmung_modus
+            data:
+              option: "{{ gespeichert }}"
+
+  - id: lichtstimmung_gewitter_blitze
+    alias: Lichtstimmung – Gewitter-Blitze
+    description: >
+      Solange ein Modus mit effekt 'blitze' aktiv ist und der Schalter
+      „Gewitter-Blitze“ an ist, blitzen ab und zu ein bis zwei Lampen auf.
+    mode: single
+    max_exceeded: silent
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.lichtstimmung_blitze_aktiv
+        to: "on"
+      - trigger: homeassistant
+        event: start
+    conditions:
+      - condition: state
+        entity_id: binary_sensor.lichtstimmung_blitze_aktiv
+        state: "on"
+    actions:
+      - repeat:
+          while:
+            - condition: state
+              entity_id: binary_sensor.lichtstimmung_blitze_aktiv
+              state: "on"
+          sequence:
+            - delay:
+                seconds: "{{ range(15, 60) | random }}"
+            - if:
+                - condition: state
+                  entity_id: binary_sensor.lichtstimmung_blitze_aktiv
+                  state: "on"
+              then:
+                - variables:
+                    kandidaten: "{{ state_attr('sensor.lichtstimmung_lampen_an', 'an') or [] }}"
+                    ziele: >
+                      {% set a = kandidaten | random %}
+                      {% set rest = kandidaten | reject('eq', a) | list %}
+                      {{ [a] + ([rest | random] if rest and (range(2) | random) == 1 else []) }}
+                - action: scene.create
+                  data:
+                    scene_id: lichtstimmung_vor_blitz
+                    snapshot_entities: "{{ ziele }}"
+                - repeat:
+                    count: "{{ range(1, 4) | random }}"
+                    sequence:
+                      - action: light.turn_on
+                        target:
+                          entity_id: "{{ ziele }}"
+                        data:
+                          color_temp_kelvin: 6500
+                          brightness: 255
+                          transition: 0
+                      - delay:
+                          milliseconds: "{{ range(60, 160) | random }}"
+                      - action: scene.turn_on
+                        target:
+                          entity_id: scene.lichtstimmung_vor_blitz
+                        data:
+                          transition: 0
+                      - delay:
+                          milliseconds: "{{ range(80, 350) | random }}"

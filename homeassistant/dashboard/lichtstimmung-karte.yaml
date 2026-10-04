@@ -1,0 +1,74 @@
+# Dashboard → Bearbeiten → Karte hinzufügen → „Manuell“ → diesen Inhalt einfügen.
+type: vertical-stack
+cards:
+  - type: tile
+    entity: input_select.lichtstimmung_modus
+    name: Lichtstimmung
+    icon: mdi:palette
+    features:
+      - type: select-options
+
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+      - type: button
+        name: An / Aus
+        icon: mdi:power
+        tap_action:
+          action: perform-action
+          perform_action: script.lichtstimmung_taste
+      - type: button
+        name: Nächster Modus
+        icon: mdi:skip-next
+        tap_action:
+          action: perform-action
+          perform_action: script.lichtstimmung_naechster_modus
+      - type: button
+        name: Neu würfeln
+        icon: mdi:dice-multiple
+        tap_action:
+          action: perform-action
+          perform_action: script.lichtstimmung_neu_wuerfeln
+
+  - type: entities
+    title: Favoriten
+    entities:
+      - entity: input_text.lichtstimmung_favorit_name
+        name: Name (optional)
+      - type: buttons
+        entities:
+          - entity: script.lichtstimmung_favorit_speichern
+            name: Aktuelle Farben speichern
+            icon: mdi:star-plus
+            tap_action:
+              action: perform-action
+              perform_action: script.lichtstimmung_favorit_speichern
+          - entity: script.lichtstimmung_favorit_loeschen
+            name: Favorit löschen
+            icon: mdi:star-remove
+            tap_action:
+              action: perform-action
+              perform_action: script.lichtstimmung_favorit_loeschen
+              confirmation:
+                text: Gewählten Favoriten wirklich löschen?
+
+  - type: entities
+    title: Einstellungen
+    state_color: true
+    entities:
+      - entity: input_boolean.lichtstimmung_zufall
+        name: Zufällige Reihenfolge
+      - entity: input_boolean.lichtstimmung_favoriten_im_wechsel
+        name: Favoriten im Wechsel
+      - entity: input_boolean.lichtstimmung_effekte
+        name: Gewitter-Blitze
+      - entity: input_boolean.lichtstimmung_wechsel_faellig
+        name: Wechsel beim nächsten Einschalten
+      - type: button
+        name: Konfiguration neu laden
+        icon: mdi:reload
+        action_name: Laden
+        tap_action:
+          action: perform-action
+          perform_action: script.lichtstimmung_neu_laden
