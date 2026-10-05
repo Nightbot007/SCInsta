@@ -101,15 +101,22 @@ Dialog ein- und ausschaltest.
    `ls configuration.yaml` muss die Datei anzeigen. Sonst bist du im falschen
    Ordner, dann bitte nicht weitermachen und mir schreiben.
 
-### Variante B: mit dem File editor
+### Variante B: ohne SSH, mit dem File editor
 
-1. Im File editor die Ordner `packages` und `custom_templates` anlegen
-   (Ordner-Symbol oben links).
-2. Drei Dateien neu anlegen und den Inhalt aus GitHub hineinkopieren (Datei auf
-   GitHub öffnen → **Raw** → alles markieren und kopieren):
-   - `packages/lichtstimmung.yaml`
-   - `custom_templates/lichtstimmung.jinja`
-   - `custom_templates/lichtstimmung_buch.jinja`
+1. Am PC die drei Dateien von GitHub herunterladen: Datei öffnen, dann rechts
+   oben auf **„Download raw file“** (Pfeil nach unten) klicken.
+   - [`lichtstimmung.yaml`](https://github.com/Nightbot007/SCInsta/blob/main/homeassistant/packages/lichtstimmung.yaml)
+   - [`lichtstimmung.jinja`](https://github.com/Nightbot007/SCInsta/blob/main/homeassistant/custom_templates/lichtstimmung.jinja)
+   - [`lichtstimmung_buch.jinja`](https://github.com/Nightbot007/SCInsta/blob/main/homeassistant/custom_templates/lichtstimmung_buch.jinja)
+2. Im File editor oben links auf das **Ordner-Symbol** klicken. Du bist jetzt
+   im Ordner `/homeassistant` (bzw. `/config`), in dem `configuration.yaml` liegt.
+3. Ordner anlegen: **„Neuer Ordner“** → `packages`. Noch einmal → `custom_templates`.
+4. In den Ordner `packages` wechseln → **Hochladen** (Wolke mit Pfeil) →
+   `lichtstimmung.yaml` auswählen.
+5. In den Ordner `custom_templates` wechseln → **Hochladen** →
+   `lichtstimmung.jinja` und `lichtstimmung_buch.jinja` auswählen.
+6. Prüfen: Die Dateinamen müssen exakt so heißen. Hat der Browser `(1)` oder
+   `.txt` angehängt, die Datei im File editor umbenennen.
 
 ## 5. Prüfen und neu starten
 
