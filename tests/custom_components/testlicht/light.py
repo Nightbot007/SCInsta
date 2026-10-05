@@ -28,7 +28,9 @@ START = {
 
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    async_add_entities(TestLicht(l["name"], l["modi"]) for l in config["lampen"])
+    async_add_entities(
+        TestLicht(l["name"], l["modi"], l.get("verliert", {})) for l in config["lampen"]
+    )
 
 
 class TestLicht(LightEntity):
@@ -37,7 +39,7 @@ class TestLicht(LightEntity):
     _attr_min_color_temp_kelvin = 2000
     _attr_max_color_temp_kelvin = 6500
 
-    def __init__(self, name, modi):
+    def __init__(self, name, modi, verliert):
         self._attr_name = name
         self._attr_unique_id = f"testlicht_{name}"
         self._attr_supported_color_modes = {ColorMode(m) for m in modi}
@@ -51,9 +53,19 @@ class TestLicht(LightEntity):
             2700 if ColorMode.COLOR_TEMP in self._attr_supported_color_modes else None
         )
         self.befehle = []
+        # Wie ein verlorenes UDP-Paket: die ersten n Befehle kommen nie an.
+        self.verliert = dict(verliert)
+
+    def _verloren(self, art):
+        if self.verliert.get(art, 0) > 0:
+            self.verliert[art] -= 1
+            return True
+        return False
 
     async def async_turn_on(self, **kwargs):
         self.befehle.append(("an", kwargs))
+        if self._verloren("an"):
+            return
         self._attr_is_on = True
         if ATTR_BRIGHTNESS in kwargs:
             self._attr_brightness = kwargs[ATTR_BRIGHTNESS]
@@ -68,5 +80,7 @@ class TestLicht(LightEntity):
 
     async def async_turn_off(self, **kwargs):
         self.befehle.append(("aus", kwargs))
+        if self._verloren("aus"):
+            return
         self._attr_is_on = False
         self.async_write_ha_state()

@@ -154,6 +154,12 @@ python3 tools/buch_importieren.py --vorschlaege
 
 ## Tipps
 
+- **Verlorene Befehle:** Govee (LAN ohne Empfangsbestätigung) und FancyLEDs
+  (Tuya-Cloud) verpassen ab und zu einen Befehl. Lampen mit `'nachsenden': true`
+  bekommen „Aus“ deshalb zweimal nachgesendet und „An/Farbe“ einmal. Zum
+  Ausschalten deshalb das Skript „Lichtstimmung – Alles aus“ nutzen, nicht eine
+  Lampengruppe.
+
 - **Smarte Lampen am Wandschalter:** In der Lampen-App bzw. in Zigbee2MQTT das
   Einschaltverhalten nach Stromausfall („power-on behavior“) auf **vorheriger
   Zustand** stellen. Sonst gehen sie nach dem Einschalten weiß an.

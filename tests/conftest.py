@@ -37,6 +37,13 @@ LAMPEN_IDS = [
     "light.hue_go_2",
     "light.hue_go_1",
 ]
+NACHSENDE_LAMPEN = {
+    "light.3_hdmi_2_1_fancy_sync_box",
+    "light.synced_fancyleds",
+    "light.h61f5_2",
+    "light.h61f5",
+    "light.h6079",
+}
 BLITZ_LAMPEN = {
     "light.hue_play_3",
     "light.hue_play_4",
@@ -60,13 +67,20 @@ def package_skripte(config):
     return list(config["script"])
 
 
-async def richte_ein(hass, config_dir, lampen=LAMPEN, jinja_anpassen=None):
-    """Lädt Package + Jinja wie in einer echten Installation."""
+async def richte_ein(hass, config_dir, lampen=LAMPEN, jinja_anpassen=None, nachsende_pause=0):
+    """Lädt Package + Jinja wie in einer echten Installation.
+
+    nachsende_pause: Pause vor dem Wiederholen von Befehlen. In Tests 0, damit
+    nicht jeder Test echte Sekunden wartet; der Ablauf ist derselbe."""
     hass.config.config_dir = str(config_dir)
     (config_dir / "custom_templates").mkdir(exist_ok=True)
     jinja = JINJA.read_text(encoding="utf-8")
     if jinja_anpassen:
         jinja = jinja_anpassen(jinja)
+    assert "{%- set NACHSENDEN_PAUSE = 1.5 -%}" in jinja
+    jinja = jinja.replace(
+        "{%- set NACHSENDEN_PAUSE = 1.5 -%}", f"{{%- set NACHSENDEN_PAUSE = {nachsende_pause} -%}}"
+    )
     (config_dir / "custom_templates" / "lichtstimmung.jinja").write_text(jinja, encoding="utf-8")
     (config_dir / "custom_templates" / "lichtstimmung_buch.jinja").write_text(
         JINJA_BUCH.read_text(encoding="utf-8"), encoding="utf-8"

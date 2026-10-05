@@ -9,7 +9,7 @@ import pytest
 from homeassistant.helpers.template import Template
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
-from conftest import BLITZ_LAMPEN, LAMPEN, LAMPEN_IDS, REPO, richte_ein
+from conftest import BLITZ_LAMPEN, LAMPEN, LAMPEN_IDS, NACHSENDE_LAMPEN, REPO, richte_ein
 
 sys.path.insert(0, str(REPO / "tools"))
 import buch_importieren  # noqa: E402
@@ -144,8 +144,8 @@ async def test_einrichtung_und_konfig_check(lichtstimmung):
     ).async_render()
     assert "❌" not in bericht and "⚠️" not in bericht, bericht
     assert "light.hue_play_3 [play, blitzt]: off · Farbe" in bericht
-    assert "light.h6079 [steh]: off · Farbe" in bericht
-    assert "light.3_hdmi_2_1_fancy_sync_box [tv]: off · Farbe" in bericht
+    assert "light.h6079 [steh, sendet nach]: off · Farbe" in bericht
+    assert "light.3_hdmi_2_1_fancy_sync_box [tv, sendet nach]: off · Farbe" in bericht
     assert "Sonnenuntergang (inaktiv)" in bericht
     assert f"Farbwörterbuch: {len(BUCH)} Kombinationen als Licht geeignet" in bericht
     assert "- Cozy: 26 aus dem Buch, 1 eigene" in bericht
@@ -469,8 +469,7 @@ async def test_lampe_nur_weiss_nur_helligkeit_und_fehlende_lampe(hass, tmp_path)
     ]
 
     def anpassen(jinja):
-        zeile = "  {'id': 'light.hue_go_1',                    'typ': 'regal',    'blitz': true},\n"
-        assert zeile in jinja
+        zeile = re.search(r"^  \{'id': 'light\.hue_go_1',.*\n", jinja, re.M).group(0)
         return jinja.replace(
             zeile,
             zeile
@@ -676,3 +675,77 @@ async def test_dashboard_zeigt_nur_vorhandene_entitaeten(lichtstimmung, datei):
         assert hass.services.has_service(domain, service), aktion
     if datei == "lichtstimmung-dashboard.yaml":
         assert set(LAMPEN_IDS) <= entitaeten  # alle Lampen auf dem Dashboard
+
+
+# --------------------------------------------------------------------------- verlorene Befehle
+def mit_verlust(**verlust):
+    """Deine Lampen, aber einzelne verlieren ihre ersten Befehle (wie verlorene UDP-Pakete)."""
+    return [
+        {**l, "verliert": verlust.get(l["name"], {})} for l in LAMPEN
+    ]
+
+
+def zaehle_befehle(hass, dienst):
+    zaehler = {}
+
+    def merke(event):
+        if event.data["domain"] == "light" and event.data["service"] == dienst:
+            ziele = event.data["service_data"]["entity_id"]
+            for e in [ziele] if isinstance(ziele, str) else ziele:
+                zaehler[e] = zaehler.get(e, 0) + 1
+
+    hass.bus.async_listen("call_service", merke)
+    return zaehler
+
+
+async def test_alles_aus_sendet_nach_wenn_befehle_verloren_gehen(hass, tmp_path):
+    # Floor Lamp Pro verliert zwei „Aus“-Befehle, M1 Pro - Unten einen.
+    await richte_ein(hass, tmp_path, lampen=mit_verlust(**{"H6079": {"aus": 2}, "H61F5 2": {"aus": 1}}))
+    await taste(hass)
+    assert all(ist_an(hass, l) for l in LAMPEN_IDS)
+
+    aus = zaehle_befehle(hass, "turn_off")
+    await taste(hass)
+    assert not any(ist_an(hass, l) for l in LAMPEN_IDS), [l for l in LAMPEN_IDS if ist_an(hass, l)]
+    # Nur Govee/FancyLEDs bekommen „Aus“ dreimal, Hue einmal.
+    assert {l: aus[l] for l in LAMPEN_IDS} == {l: 3 if l in NACHSENDE_LAMPEN else 1 for l in LAMPEN_IDS}
+    assert flag(hass) == "on"
+
+
+async def test_farbe_wird_nachgesendet_wenn_befehl_verloren_geht(hass, tmp_path):
+    await richte_ein(hass, tmp_path, lampen=mit_verlust(**{"H6079": {"an": 1}}))
+    an = zaehle_befehle(hass, "turn_on")
+    await taste(hass)
+    folgt_dem_plan(hass)  # Floor Lamp Pro ist trotzdem an und hat ihre Farbe
+    assert an["light.h6079"] == 2
+    assert an["light.hue_play_3"] == 1
+
+
+async def test_alles_aus_stoppt_nachsenden_und_nichts_geht_wieder_an(hass, tmp_path, freezer):
+    """Mit echter Pause: „An“ und sofort „Aus“ – nachgesendete Farbbefehle dürfen
+    keine Lampe wieder einschalten."""
+    await richte_ein(hass, tmp_path, nachsende_pause=3)
+
+    async def takte():
+        for _ in range(50):
+            await asyncio.sleep(0)
+
+    async def zeit_vor(sekunden):
+        for _ in range(int(sekunden * 10)):
+            freezer.tick(timedelta(milliseconds=100))
+            async_fire_time_changed(hass)
+            await takte()
+
+    knopf = {"entity_id": "input_button.lichtstimmung_taste"}
+    await hass.services.async_call("input_button", "press", knopf, blocking=True)
+    await takte()
+    assert all(ist_an(hass, l) for l in LAMPEN_IDS)  # erster Befehl, Nachsenden steht noch aus
+
+    await zeit_vor(0.5)  # deutlich weniger als die Pause
+    an = zaehle_befehle(hass, "turn_on")
+    await hass.services.async_call("input_button", "press", knopf, blocking=True)
+    await zeit_vor(10)
+    assert not any(ist_an(hass, l) for l in LAMPEN_IDS), [l for l in LAMPEN_IDS if ist_an(hass, l)]
+    assert an == {}, an  # nach „Aus“ geht kein einziger Einschaltbefehl mehr raus
+    assert hass.states.get("script.lichtstimmung_lampe_setzen").state == "off"
+    assert hass.states.get("script.lichtstimmung_alles_aus").state == "off"

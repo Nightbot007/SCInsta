@@ -178,6 +178,19 @@ Die virtuelle Taste in der Dashboard-Karte funktioniert weiterhin.
   `custom_templates/lichtstimmung.jinja` beim Modus unter `'buch'` eintragen,
   dann das Skript **„Lichtstimmung – Konfiguration neu laden“** ausführen.
 
+## 9. iPhone: Kurzbefehle und Widget
+
+Kurzbefehle nutzen die Aktionen der **Home Assistant App** („Skript ausführen“).
+Zum Ausschalten immer das Skript **„Lichtstimmung – Alles aus“** (oder
+„Lichtstimmung – Taste“ zum Umschalten) nehmen, **nicht** die Lampengruppe:
+
+- Nur das Skript merkt sich, dass beim nächsten Einschalten der Modus wechselt.
+- Nur das Skript sendet „Aus“ an Govee und FancyLEDs zweimal nach. Bei diesen
+  Lampen geht ab und zu ein Befehl verloren, dann bliebe eine Lampe an.
+
+Widget: Kurzbefehle in einen Ordner „Lichtstimmung“ legen → Homescreen lange
+drücken → Widget „Kurzbefehle“ → Ordner auswählen.
+
 ## Spätere Updates
 
 Die drei `curl`-Befehle aus Schritt 4 nochmal ausführen. Danach:

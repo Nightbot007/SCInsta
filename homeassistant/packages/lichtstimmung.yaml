@@ -146,6 +146,11 @@ script:
     icon: mdi:lightbulb-group-off
     mode: queued
     sequence:
+      # Laufende Farbwechsel stoppen, damit kein nachgesendeter Befehl eine
+      # Lampe wieder einschaltet.
+      - action: script.turn_off
+        target:
+          entity_id: script.lichtstimmung_lampe_setzen
       - action: input_boolean.turn_on
         target:
           entity_id: input_boolean.lichtstimmung_wechsel_faellig
@@ -156,6 +161,24 @@ script:
             {{ lampen_ids() | from_json }}
         data:
           transition: 1
+      # Govee/FancyLEDs: ab und zu geht ein Befehl verloren – zweimal nachsenden.
+      - variables:
+          nachsenden: >
+            {% from 'lichtstimmung.jinja' import nachsende_lampen %}
+            {{ nachsende_lampen() | from_json }}
+          pause: >
+            {% from 'lichtstimmung.jinja' import nachsende_pause %}
+            {{ nachsende_pause() | float(1.5) }}
+      - if: "{{ nachsenden | count > 0 }}"
+        then:
+          - repeat:
+              count: 2
+              sequence:
+                - delay:
+                    seconds: "{{ pause }}"
+                - action: light.turn_off
+                  target:
+                    entity_id: "{{ nachsenden }}"
 
   lichtstimmung_alles_an:
     alias: Lichtstimmung – Alles an
@@ -375,57 +398,71 @@ script:
           # 'hell' = Prozent (Modi), 'bri' = exakter Wert 1–255 (Favoriten)
           helligkeit: >
             {{ wert.bri if wert.bri is defined else ((wert.hell | default(100)) * 2.55) | round(0) | int }}
-      - choose:
-          - conditions: "{{ not wert.an }}"
-            sequence:
-              - action: light.turn_off
-                target:
-                  entity_id: "{{ lampe }}"
-                data:
-                  transition: "{{ t }}"
-          - conditions: "{{ wert.hs is defined }}"
-            sequence:
-              - action: light.turn_on
-                target:
-                  entity_id: "{{ lampe }}"
-                data:
-                  hs_color: "{{ wert.hs }}"
-                  brightness: "{{ helligkeit }}"
-                  transition: "{{ t }}"
-          - conditions: "{{ wert.xy is defined }}"
-            sequence:
-              - action: light.turn_on
-                target:
-                  entity_id: "{{ lampe }}"
-                data:
-                  xy_color: "{{ wert.xy }}"
-                  brightness: "{{ helligkeit }}"
-                  transition: "{{ t }}"
-          - conditions: "{{ wert.rgb is defined }}"
-            sequence:
-              - action: light.turn_on
-                target:
-                  entity_id: "{{ lampe }}"
-                data:
-                  rgb_color: "{{ wert.rgb }}"
-                  brightness: "{{ helligkeit }}"
-                  transition: "{{ t }}"
-          - conditions: "{{ wert.kelvin is defined }}"
-            sequence:
-              - action: light.turn_on
-                target:
-                  entity_id: "{{ lampe }}"
-                data:
-                  color_temp_kelvin: "{{ wert.kelvin }}"
-                  brightness: "{{ helligkeit }}"
-                  transition: "{{ t }}"
-        default:
-          - action: light.turn_on
-            target:
-              entity_id: "{{ lampe }}"
-            data:
-              brightness: "{{ helligkeit }}"
-              transition: "{{ t }}"
+          # Govee/FancyLEDs: Befehl nach kurzer Pause einmal wiederholen
+          wiederholen: >
+            {% from 'lichtstimmung.jinja' import nachsenden %}
+            {{ nachsenden(lampe) | from_json }}
+          pause: >
+            {% from 'lichtstimmung.jinja' import nachsende_pause %}
+            {{ nachsende_pause() | float(1.5) }}
+      - repeat:
+          count: "{{ 2 if wiederholen else 1 }}"
+          sequence:
+            - if: "{{ repeat.index > 1 }}"
+              then:
+                - delay:
+                    seconds: "{{ pause }}"
+            - choose:
+                - conditions: "{{ not wert.an }}"
+                  sequence:
+                    - action: light.turn_off
+                      target:
+                        entity_id: "{{ lampe }}"
+                      data:
+                        transition: "{{ t }}"
+                - conditions: "{{ wert.hs is defined }}"
+                  sequence:
+                    - action: light.turn_on
+                      target:
+                        entity_id: "{{ lampe }}"
+                      data:
+                        hs_color: "{{ wert.hs }}"
+                        brightness: "{{ helligkeit }}"
+                        transition: "{{ t }}"
+                - conditions: "{{ wert.xy is defined }}"
+                  sequence:
+                    - action: light.turn_on
+                      target:
+                        entity_id: "{{ lampe }}"
+                      data:
+                        xy_color: "{{ wert.xy }}"
+                        brightness: "{{ helligkeit }}"
+                        transition: "{{ t }}"
+                - conditions: "{{ wert.rgb is defined }}"
+                  sequence:
+                    - action: light.turn_on
+                      target:
+                        entity_id: "{{ lampe }}"
+                      data:
+                        rgb_color: "{{ wert.rgb }}"
+                        brightness: "{{ helligkeit }}"
+                        transition: "{{ t }}"
+                - conditions: "{{ wert.kelvin is defined }}"
+                  sequence:
+                    - action: light.turn_on
+                      target:
+                        entity_id: "{{ lampe }}"
+                      data:
+                        color_temp_kelvin: "{{ wert.kelvin }}"
+                        brightness: "{{ helligkeit }}"
+                        transition: "{{ t }}"
+              default:
+                - action: light.turn_on
+                  target:
+                    entity_id: "{{ lampe }}"
+                  data:
+                    brightness: "{{ helligkeit }}"
+                    transition: "{{ t }}"
 
   lichtstimmung_favorit_speichern:
     alias: Lichtstimmung – Aktuelle Farben als Favorit speichern

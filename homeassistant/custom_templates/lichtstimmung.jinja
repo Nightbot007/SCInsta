@@ -37,21 +37,27 @@
   blitz  true = darf bei „Gewitter-Blitze“ aufblitzen. Nur für Lampen mit
          schneller lokaler Verbindung (Hue). Über die Cloud angebundene
          Lampen sind dafür zu träge und haben Befehlslimits.
+  nachsenden
+         true = Befehle werden nach einer kurzen Pause wiederholt („Aus“
+         zweimal, „An/Farbe“ einmal). Für Lampen, bei denen ab und zu ein
+         Befehl verloren geht: Govee (LAN ohne Empfangsbestätigung) und
+         FancyLEDs (Tuya-Cloud). Pause: NACHSENDEN_PAUSE in Sekunden.
 
   Ob eine Lampe Farbe, nur Weiß (Farbtemperatur) oder nur Helligkeit kann,
   erkennt Home Assistant selbst – das muss hier nicht eingetragen werden.
 ------------------------------------------------------------------------- -#}
 {%- set LAMPEN = [
-  {'id': 'light.hue_play_3',                  'typ': 'play',     'blitz': true},
-  {'id': 'light.3_hdmi_2_1_fancy_sync_box',   'typ': 'tv',       'blitz': false},
-  {'id': 'light.synced_fancyleds',            'typ': 'unterbau', 'blitz': false},
-  {'id': 'light.h61f5_2',                     'typ': 'unterbau', 'blitz': false},
-  {'id': 'light.h61f5',                       'typ': 'regal',    'blitz': false},
-  {'id': 'light.h6079',                       'typ': 'steh',     'blitz': false},
-  {'id': 'light.hue_play_4',                  'typ': 'play',     'blitz': true},
-  {'id': 'light.hue_go_2',                    'typ': 'regal',    'blitz': true},
-  {'id': 'light.hue_go_1',                    'typ': 'regal',    'blitz': true},
+  {'id': 'light.hue_play_3',                'typ': 'play',     'blitz': true},
+  {'id': 'light.3_hdmi_2_1_fancy_sync_box', 'typ': 'tv',       'blitz': false, 'nachsenden': true},
+  {'id': 'light.synced_fancyleds',          'typ': 'unterbau', 'blitz': false, 'nachsenden': true},
+  {'id': 'light.h61f5_2',                   'typ': 'unterbau', 'blitz': false, 'nachsenden': true},
+  {'id': 'light.h61f5',                     'typ': 'regal',    'blitz': false, 'nachsenden': true},
+  {'id': 'light.h6079',                     'typ': 'steh',     'blitz': false, 'nachsenden': true},
+  {'id': 'light.hue_play_4',                'typ': 'play',     'blitz': true},
+  {'id': 'light.hue_go_2',                  'typ': 'regal',    'blitz': true},
+  {'id': 'light.hue_go_1',                  'typ': 'regal',    'blitz': true},
 ] -%}
+{%- set NACHSENDEN_PAUSE = 1.5 -%}
 
 {#- -------------------------------------------------------------------------
   2) MODI
@@ -227,6 +233,21 @@
 {{- ns.l | to_json -}}
 {%- endmacro -%}
 
+{#- Lampen, deren Befehle wiederholt werden (JSON-Liste) -#}
+{%- macro nachsende_lampen() -%}
+{{- LAMPEN | selectattr('nachsenden', 'defined') | selectattr('nachsenden') | map(attribute='id') | list | to_json -}}
+{%- endmacro -%}
+
+{#- Werden Befehle an diese Lampe wiederholt? (JSON: true/false) -#}
+{%- macro nachsenden(lampe) -%}
+{{- (lampe in (nachsende_lampen() | from_json)) | to_json -}}
+{%- endmacro -%}
+
+{#- Pause vor dem Wiederholen in Sekunden -#}
+{%- macro nachsende_pause() -%}
+{{- NACHSENDEN_PAUSE -}}
+{%- endmacro -%}
+
 {#- Namen aller aktiven Modi in der festgelegten Reihenfolge (JSON-Liste) -#}
 {%- macro modi_namen() -%}
 {%- set ns = namespace(l=[]) -%}
@@ -398,7 +419,7 @@
 LAMPEN ({{ LAMPEN | count }})
 {%- for l in LAMPEN %}
 {%- set modi = state_attr(l.id, 'supported_color_modes') or [] %}
-- {{ l.id }} [{{ l.typ }}{{ ', blitzt' if l.get('blitz', true) else '' }}]:
+- {{ l.id }} [{{ l.typ }}{{ ', blitzt' if l.get('blitz', true) else '' }}{{ ', sendet nach' if l.get('nachsenden') else '' }}]:
 {%- if expand(l.id) | count == 0 %} ❌ nicht gefunden – Entity-ID prüfen
 {%- else %} {{ states(l.id) }} · {{ 'Farbe' if modi | select('in', FARBMODI) | list | count > 0 else ('nur Weiß (Kelvin)' if 'color_temp' in modi else 'nur Helligkeit') }}
 {%- endif %}
