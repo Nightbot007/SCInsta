@@ -77,6 +77,16 @@ template:
           stand: >
             {{ trigger.event.data.stand if 'stand' in trigger.event.data
                else this.attributes.get('stand', '') }}
+          # „Volle Helligkeit“: Helligkeit vorher und zu welcher Stimmung sie gehört
+          hell_vorher: >
+            {{ trigger.event.data.hell_vorher if 'hell_vorher' in trigger.event.data
+               else this.attributes.get('hell_vorher', {}) }}
+          hell_stand: >
+            {{ trigger.event.data.hell_stand if 'hell_stand' in trigger.event.data
+               else this.attributes.get('hell_stand', '') }}
+          hell_wechsel: >
+            {{ trigger.event.data.hell_wechsel if 'hell_wechsel' in trigger.event.data
+               else this.attributes.get('hell_wechsel', false) }}
 
   # Speicher für Favoriten (gespeicherte Farbkombinationen).
   - triggers:
@@ -255,6 +265,92 @@ script:
       - action: script.lichtstimmung_anwenden
         data:
           neu: true
+
+  lichtstimmung_volle_helligkeit:
+    alias: Lichtstimmung – Volle Helligkeit (an/zurück)
+    description: >
+      Erster Druck: alle Lampen auf 100 %, die Farben bleiben (ausgeschaltete
+      Lampen gehen in der Farbe der Stimmung mit an). Zweiter Druck: zurück
+      auf die Helligkeit von vorher. Kam dazwischen eine neue Stimmung, schaltet
+      der nächste Druck wieder auf 100 %.
+    icon: mdi:brightness-7
+    mode: queued
+    max: 3
+    sequence:
+      - variables:
+          vorher: "{{ state_attr('sensor.lichtstimmung_zustand', 'hell_vorher') or {} }}"
+          wechsel_vorher: "{{ state_attr('sensor.lichtstimmung_zustand', 'hell_wechsel') | bool(false) }}"
+          aktiv: >
+            {{ vorher is mapping and vorher | count > 0
+               and state_attr('sensor.lichtstimmung_zustand', 'hell_stand')
+                   == state_attr('sensor.lichtstimmung_zustand', 'stand') }}
+      - if: "{{ aktiv }}"
+        then:
+          # Zurück auf die Helligkeit von vorher
+          - event: lichtstimmung_zustand
+            event_data:
+              hell_vorher: "{{ {} }}"
+          - repeat:
+              for_each: "{{ vorher | list }}"
+              sequence:
+                - action: script.turn_on
+                  target:
+                    entity_id: script.lichtstimmung_lampe_setzen
+                  data:
+                    variables:
+                      lampe: "{{ repeat.item }}"
+                      wert: "{{ vorher[repeat.item] }}"
+                      uebergang: 1
+          # War vorher per Taste alles aus, wechselt beim nächsten Einschalten
+          # wieder der Modus – wie ohne „Volle Helligkeit“.
+          - if: "{{ wechsel_vorher }}"
+            then:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.lichtstimmung_wechsel_faellig
+        else:
+          # Helligkeit merken, dann alle Lampen auf 100 %
+          - variables:
+              aufnahme: >
+                {% from 'lichtstimmung.jinja' import helligkeit_aufnahme %}
+                {{ helligkeit_aufnahme() | from_json }}
+              plan: "{{ state_attr('sensor.lichtstimmung_zustand', 'zuweisung') or {} }}"
+              ziel: >
+                {% set ns = namespace(out={}) %}
+                {% for id, a in aufnahme.items() %}
+                  {% if not a.an and id in plan and plan[id].an %}
+                    {% set w = dict(plan[id], an=true, bri=255) %}
+                  {% else %}
+                    {% set w = {'an': true, 'bri': 255} %}
+                  {% endif %}
+                  {% set ns.out = dict(ns.out, **{id: w}) %}
+                {% endfor %}
+                {{ ns.out }}
+          # Erst merken, dann schalten (gleich danach sind alle Lampen an).
+          # Ein fälliger Moduswechsel wird ausgesetzt: „Volle Helligkeit“ ist
+          # kein normales Einschalten und soll keinen neuen Modus starten.
+          - variables:
+              wechsel: "{{ is_state('input_boolean.lichtstimmung_wechsel_faellig', 'on') }}"
+          - event: lichtstimmung_zustand
+            event_data:
+              hell_vorher: "{{ aufnahme }}"
+              hell_stand: "{{ state_attr('sensor.lichtstimmung_zustand', 'stand') }}"
+              hell_wechsel: "{{ wechsel }}"
+              offen: "{{ [] }}"
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.lichtstimmung_wechsel_faellig
+          - repeat:
+              for_each: "{{ ziel | list }}"
+              sequence:
+                - action: script.turn_on
+                  target:
+                    entity_id: script.lichtstimmung_lampe_setzen
+                  data:
+                    variables:
+                      lampe: "{{ repeat.item }}"
+                      wert: "{{ ziel[repeat.item] }}"
+                      uebergang: 1
 
   lichtstimmung_anwenden:
     alias: Lichtstimmung – Modus anwenden

@@ -18,7 +18,7 @@ cards:
         icon: mdi:book-open-variant
 
   - type: grid
-    columns: 3
+    columns: 2
     square: false
     cards:
       - type: button
@@ -39,6 +39,12 @@ cards:
         tap_action:
           action: perform-action
           perform_action: script.lichtstimmung_neu_wuerfeln
+      - type: button
+        name: Volle Helligkeit
+        icon: mdi:brightness-7
+        tap_action:
+          action: perform-action
+          perform_action: script.lichtstimmung_volle_helligkeit
 
   - type: entities
     title: Favoriten

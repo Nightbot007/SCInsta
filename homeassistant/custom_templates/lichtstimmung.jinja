@@ -393,6 +393,20 @@
 {{- ns.out | to_json -}}
 {%- endmacro -%}
 
+{#- An/aus und Helligkeit (1–255) aller Lampen, für „Volle Helligkeit“ -#}
+{%- macro helligkeit_aufnahme() -%}
+{%- set ns = namespace(out={}) -%}
+{%- for l in LAMPEN -%}
+  {%- if is_state(l.id, 'on') -%}
+    {%- set w = {'an': true, 'bri': [state_attr(l.id, 'brightness') | int(255), 1] | max} -%}
+  {%- else -%}
+    {%- set w = {'an': false} -%}
+  {%- endif -%}
+  {%- set ns.out = dict(ns.out, **{l.id: w}) -%}
+{%- endfor -%}
+{{- ns.out | to_json -}}
+{%- endmacro -%}
+
 {#- Favoritenliste nach Speichern/Löschen (für sensor.lichtstimmung_favoriten) -#}
 {%- macro favoriten_neu(alt, d) -%}
 {%- set alt = alt if alt is mapping else {} -%}

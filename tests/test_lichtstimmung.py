@@ -749,3 +749,77 @@ async def test_alles_aus_stoppt_nachsenden_und_nichts_geht_wieder_an(hass, tmp_p
     assert an == {}, an  # nach „Aus“ geht kein einziger Einschaltbefehl mehr raus
     assert hass.states.get("script.lichtstimmung_lampe_setzen").state == "off"
     assert hass.states.get("script.lichtstimmung_alles_aus").state == "off"
+
+
+# --------------------------------------------------------------------------- Volle Helligkeit
+async def volle_helligkeit(hass):
+    await skript(hass, "lichtstimmung_volle_helligkeit")
+
+
+def helligkeiten(hass):
+    return {l: hass.states.get(l).attributes.get("brightness") if ist_an(hass, l) else None for l in LAMPEN_IDS}
+
+
+def farben(hass):
+    return {l: hass.states.get(l).attributes.get("hs_color") for l in LAMPEN_IDS if ist_an(hass, l)}
+
+
+async def test_volle_helligkeit_und_wieder_zurueck(lichtstimmung):
+    hass = lichtstimmung
+    await taste(hass)
+    hell_vorher, farben_vorher = helligkeiten(hass), farben(hass)
+    assert all(b < 255 for b in hell_vorher.values()), hell_vorher
+
+    await volle_helligkeit(hass)
+    assert all(b == 255 for b in helligkeiten(hass).values()), helligkeiten(hass)
+    assert farben(hass) == farben_vorher  # Farben bleiben
+
+    await volle_helligkeit(hass)
+    assert helligkeiten(hass) == hell_vorher  # exakt wie vorher
+    assert farben(hass) == farben_vorher
+    folgt_dem_plan(hass)
+
+
+async def test_volle_helligkeit_schaltet_aus_lampen_mit_an_und_wieder_aus(lichtstimmung):
+    hass = lichtstimmung
+    await taste(hass)
+    await licht(hass, "off", "light.h6079")
+    await licht(hass, "off", "light.hue_go_1")
+    plan = zustand(hass).attributes["zuweisung"]
+
+    await volle_helligkeit(hass)
+    assert all(b == 255 for b in helligkeiten(hass).values()), helligkeiten(hass)
+    for l in ("light.h6079", "light.hue_go_1"):  # kommen in der Farbe der Stimmung
+        assert gleiche_farbe(hass.states.get(l).attributes["hs_color"], plan[l]["hs"]), l
+
+    await volle_helligkeit(hass)
+    assert not ist_an(hass, "light.h6079")
+    assert not ist_an(hass, "light.hue_go_1")
+    assert all(ist_an(hass, l) for l in LAMPEN_IDS if l not in ("light.h6079", "light.hue_go_1"))
+
+
+async def test_volle_helligkeit_nach_neuer_stimmung_wieder_hoch(lichtstimmung):
+    hass = lichtstimmung
+    await taste(hass)
+    await volle_helligkeit(hass)
+    await skript(hass, "lichtstimmung_neu_wuerfeln")
+    assert any(b < 255 for b in helligkeiten(hass).values())
+
+    await volle_helligkeit(hass)  # nicht auf die alte Stimmung zurück, sondern hoch
+    assert all(b == 255 for b in helligkeiten(hass).values())
+    await volle_helligkeit(hass)  # zurück auf die neue Stimmung
+    folgt_dem_plan(hass)
+
+
+async def test_volle_helligkeit_aus_dem_dunkeln(lichtstimmung):
+    hass = lichtstimmung
+    await taste(hass)
+    await taste(hass)  # alles aus -> Moduswechsel fällig
+    await volle_helligkeit(hass)
+    assert all(b == 255 for b in helligkeiten(hass).values())
+    assert modus(hass) == "Cozy"  # kein Moduswechsel durch „Volle Helligkeit“
+    await volle_helligkeit(hass)
+    assert not any(ist_an(hass, l) for l in LAMPEN_IDS)
+    assert flag(hass) == "on"  # der fällige Wechsel ist wieder da
+    await taste(hass)
+    assert modus(hass) == "Cyberpunk"

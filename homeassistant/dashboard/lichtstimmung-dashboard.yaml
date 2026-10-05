@@ -49,6 +49,16 @@ views:
               action: perform-action
               perform_action: script.lichtstimmung_neu_wuerfeln
           - type: tile
+            entity: script.lichtstimmung_volle_helligkeit
+            name: Volle Helligkeit
+            icon: mdi:brightness-7
+            tap_action:
+              action: perform-action
+              perform_action: script.lichtstimmung_volle_helligkeit
+            icon_tap_action:
+              action: perform-action
+              perform_action: script.lichtstimmung_volle_helligkeit
+          - type: tile
             entity: script.lichtstimmung_naechster_modus
             name: Nächster Modus
             icon: mdi:skip-next

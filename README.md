@@ -101,6 +101,7 @@ gedämpft. Gewitter-Blitze laufen nur über die vier Hue-Lampen.
 | Alles an/aus | Taste oder Skript „Lichtstimmung – Taste“ |
 | Modus direkt wählen | Auswahl „Lichtstimmung“ |
 | Gleicher Modus, andere Kombination | Skript „Neu würfeln“ |
+| Alle Lampen auf 100 % – und wieder zurück | Skript „Volle Helligkeit“: 1. Druck 100 % (Farben bleiben), 2. Druck Helligkeit wie vorher |
 | Welche Buch-Kombination leuchtet? | Zeile „Kombination“ in der Karte, z. B. „Buch Nr. 236“ |
 | Das ganze Buch durchstöbern | Modus „Farbwörterbuch“ + „Neu würfeln“, Treffer als Favorit speichern |
 | Favorit speichern | optional Namen eintippen → „Als Favorit speichern“ (ohne Namen: z. B. „Cozy 04.10. 21:15“) |

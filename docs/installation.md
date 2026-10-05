@@ -188,6 +188,9 @@ Zum Ausschalten immer das Skript **„Lichtstimmung – Alles aus“** (oder
 - Nur das Skript sendet „Aus“ an Govee und FancyLEDs zweimal nach. Bei diesen
   Lampen geht ab und zu ein Befehl verloren, dann bliebe eine Lampe an.
 
+Für „alles hell und wieder zurück“: Skript **„Lichtstimmung – Volle Helligkeit
+(an/zurück)“**.
+
 Widget: Kurzbefehle in einen Ordner „Lichtstimmung“ legen → Homescreen lange
 drücken → Widget „Kurzbefehle“ → Ordner auswählen.
 
