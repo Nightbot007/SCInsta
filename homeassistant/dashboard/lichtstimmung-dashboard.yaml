@@ -1,0 +1,187 @@
+# Komplettes Dashboard „Lichtstimmung“
+# Dashboard öffnen → Stift (Bearbeiten) → ⋮ oben rechts → „Raw configuration editor“
+# (Raw-Konfigurationseditor) → alles ersetzen durch diesen Inhalt → Speichern.
+views:
+  - title: Lichtstimmung
+    path: lichtstimmung
+    icon: mdi:palette
+    type: sections
+    max_columns: 3
+    sections:
+      # ------------------------------------------------------------ Steuerung
+      - type: grid
+        cards:
+          - type: heading
+            heading: Lichtstimmung
+            icon: mdi:palette
+          - type: tile
+            entity: input_select.lichtstimmung_modus
+            name: Modus
+            features:
+              - type: select-options
+            grid_options:
+              columns: full
+          - type: tile
+            entity: sensor.lichtstimmung_zustand
+            name: Kombination
+            icon: mdi:book-open-variant
+            state_content: quelle
+            grid_options:
+              columns: full
+          - type: tile
+            entity: script.lichtstimmung_taste
+            name: An / Aus
+            icon: mdi:power
+            tap_action:
+              action: perform-action
+              perform_action: script.lichtstimmung_taste
+            icon_tap_action:
+              action: perform-action
+              perform_action: script.lichtstimmung_taste
+          - type: tile
+            entity: script.lichtstimmung_neu_wuerfeln
+            name: Neu würfeln
+            icon: mdi:dice-multiple
+            tap_action:
+              action: perform-action
+              perform_action: script.lichtstimmung_neu_wuerfeln
+            icon_tap_action:
+              action: perform-action
+              perform_action: script.lichtstimmung_neu_wuerfeln
+          - type: tile
+            entity: script.lichtstimmung_naechster_modus
+            name: Nächster Modus
+            icon: mdi:skip-next
+            tap_action:
+              action: perform-action
+              perform_action: script.lichtstimmung_naechster_modus
+            icon_tap_action:
+              action: perform-action
+              perform_action: script.lichtstimmung_naechster_modus
+
+      # ------------------------------------------------------------ Favoriten
+      - type: grid
+        cards:
+          - type: heading
+            heading: Favoriten
+            icon: mdi:star
+          - type: entities
+            entities:
+              - entity: input_text.lichtstimmung_favorit_name
+                name: Name (optional)
+            grid_options:
+              columns: full
+          - type: tile
+            entity: script.lichtstimmung_favorit_speichern
+            name: Farben speichern
+            icon: mdi:star-plus
+            tap_action:
+              action: perform-action
+              perform_action: script.lichtstimmung_favorit_speichern
+            icon_tap_action:
+              action: perform-action
+              perform_action: script.lichtstimmung_favorit_speichern
+          - type: tile
+            entity: script.lichtstimmung_favorit_loeschen
+            name: Favorit löschen
+            icon: mdi:star-remove
+            tap_action:
+              action: perform-action
+              perform_action: script.lichtstimmung_favorit_loeschen
+              confirmation:
+                text: Gewählten Favoriten wirklich löschen?
+            icon_tap_action:
+              action: perform-action
+              perform_action: script.lichtstimmung_favorit_loeschen
+              confirmation:
+                text: Gewählten Favoriten wirklich löschen?
+
+      # ------------------------------------------------------------ Einstellungen
+      - type: grid
+        cards:
+          - type: heading
+            heading: Einstellungen
+            icon: mdi:cog
+          - type: tile
+            entity: input_boolean.lichtstimmung_zufall
+            name: Zufällige Reihenfolge
+            tap_action:
+              action: toggle
+          - type: tile
+            entity: input_boolean.lichtstimmung_favoriten_im_wechsel
+            name: Favoriten im Wechsel
+            tap_action:
+              action: toggle
+          - type: tile
+            entity: input_boolean.lichtstimmung_effekte
+            name: Gewitter-Blitze
+            tap_action:
+              action: toggle
+          - type: tile
+            entity: input_boolean.lichtstimmung_wechsel_faellig
+            name: Wechsel beim nächsten An
+            tap_action:
+              action: toggle
+          - type: tile
+            entity: script.lichtstimmung_neu_laden
+            name: Konfiguration neu laden
+            icon: mdi:reload
+            tap_action:
+              action: perform-action
+              perform_action: script.lichtstimmung_neu_laden
+            icon_tap_action:
+              action: perform-action
+              perform_action: script.lichtstimmung_neu_laden
+
+      # ------------------------------------------------------------ Lampen
+      # Hier einzelne Lampen nachjustieren, bevor du einen Favoriten speicherst.
+      - type: grid
+        cards:
+          - type: heading
+            heading: Lampen
+            icon: mdi:lightbulb-group
+          - type: tile
+            entity: light.hue_play_3
+            name: Hue Play Kommode
+            features:
+              - type: light-brightness
+          - type: tile
+            entity: light.3_hdmi_2_1_fancy_sync_box
+            name: TV-Backlight
+            features:
+              - type: light-brightness
+          - type: tile
+            entity: light.synced_fancyleds
+            name: Kommode unten
+            features:
+              - type: light-brightness
+          - type: tile
+            entity: light.h61f5_2
+            name: Regal unten
+            features:
+              - type: light-brightness
+          - type: tile
+            entity: light.h61f5
+            name: Regal oben
+            features:
+              - type: light-brightness
+          - type: tile
+            entity: light.h6079
+            name: Floor Lamp Pro
+            features:
+              - type: light-brightness
+          - type: tile
+            entity: light.hue_play_4
+            name: Hue Play Treppenregal
+            features:
+              - type: light-brightness
+          - type: tile
+            entity: light.hue_go_2
+            name: Hue Go rechts
+            features:
+              - type: light-brightness
+          - type: tile
+            entity: light.hue_go_1
+            name: Hue Go links
+            features:
+              - type: light-brightness

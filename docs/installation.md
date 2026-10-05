@@ -129,16 +129,28 @@ Farbverlauf wichtig: in `lichtstimmung.jinja` die beiden Zeilen tauschen.
    Rechts müssen alle 9 Lampen mit „Farbe“ stehen, ohne ❌.
    Ein ❌ heißt: Entity-ID stimmt nicht – zurück zu Schritt 2.
 
-## 6. Dashboard-Karte
+## 6. Dashboard
 
-Dashboard öffnen → **Stift (Bearbeiten)** → **+ Karte hinzufügen** → ganz unten
-**„Manuell“** → Inhalt von
-[`homeassistant/dashboard/lichtstimmung-karte.yaml`](../homeassistant/dashboard/lichtstimmung-karte.yaml)
-einfügen → **Speichern**.
+1. **Einstellungen → Dashboards → + Dashboard hinzufügen → „Neues Dashboard von
+   Grund auf“** → Name „Lichtstimmung“ → Erstellen.
+2. Dashboard in der Seitenleiste öffnen → **Stift** (Bearbeiten).
+3. **⋮ oben rechts → „Raw-Konfigurationseditor“** (englisch: „Raw configuration
+   editor“).
+4. Alles darin löschen, den Inhalt von
+   [`homeassistant/dashboard/lichtstimmung-dashboard.yaml`](../homeassistant/dashboard/lichtstimmung-dashboard.yaml)
+   einfügen → **Speichern** → **X** → **Fertig**.
 
-Jetzt **„An / Aus“** in der Karte drücken: Alle 9 Lampen gehen in der ersten
-Stimmung an. Nochmal drücken = alles aus. Beim nächsten „An“ kommt der nächste
-Modus.
+Das Dashboard hat vier Bereiche: **Lichtstimmung** (Modus, aktuelle Kombination,
+An/Aus, Neu würfeln, Nächster Modus), **Favoriten** (Name, Speichern,
+Löschen), **Einstellungen** (Zufall, Favoriten im Wechsel, Gewitter-Blitze)
+und **Lampen** (alle 9 Lampen zum Nachjustieren).
+
+Nur eine einzelne Karte für ein bestehendes Dashboard: Karte hinzufügen →
+„Manuell“ → Inhalt von
+[`lichtstimmung-karte.yaml`](../homeassistant/dashboard/lichtstimmung-karte.yaml).
+
+Jetzt **„An / Aus“** drücken: Alle 9 Lampen gehen in der ersten Stimmung an.
+Nochmal drücken = alles aus. Beim nächsten „An“ kommt der nächste Modus.
 
 ## 7. Deine Taste
 

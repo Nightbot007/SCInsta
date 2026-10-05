@@ -24,7 +24,8 @@ Farbwörterbuch, …).
 | `custom_templates/lichtstimmung.jinja` | **Deine Konfiguration:** Lampen (in Raumreihenfolge) und Modi (Buch-Nummern + eigene Paletten) |
 | `custom_templates/lichtstimmung_buch.jinja` | Die 333 als Licht geeigneten Kombinationen des Buchs (erzeugt, nicht bearbeiten) |
 | `packages/lichtstimmung.yaml` | Logik: Helfer, Skripte, Automationen, Speicher-Sensoren |
-| `dashboard/lichtstimmung-karte.yaml` | Fertige Dashboard-Karte |
+| `dashboard/lichtstimmung-dashboard.yaml` | Komplettes Dashboard (Raw-Konfigurationseditor) |
+| `dashboard/lichtstimmung-karte.yaml` | Einzelne Karte für ein bestehendes Dashboard |
 
 **Farbverteilung:** Bei jedem Einschalten wählt der Modus eine Kombination: aus
 seiner Liste von Buch-Nummern oder aus deinen eigenen Paletten, nie zweimal

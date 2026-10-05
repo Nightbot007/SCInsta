@@ -644,3 +644,35 @@ def test_readme_beispiel_ist_gueltiges_jinja():
     block = re.search(r"```jinja\n(.*?)```", readme, re.S).group(1)
     modi = jinja2.Environment().from_string("{%- set M = {\n" + block + "} -%}{{ M | list }}").render()
     assert modi == "['Kino']"
+
+
+@pytest.mark.parametrize("datei", ["lichtstimmung-dashboard.yaml", "lichtstimmung-karte.yaml"])
+async def test_dashboard_zeigt_nur_vorhandene_entitaeten(lichtstimmung, datei):
+    import yaml
+
+    hass = lichtstimmung
+    inhalt = yaml.safe_load((REPO / "homeassistant" / "dashboard" / datei).read_text(encoding="utf-8"))
+    entitaeten, aktionen = set(), set()
+
+    def sammeln(knoten):
+        if isinstance(knoten, dict):
+            for k, v in knoten.items():
+                if k == "entity":
+                    entitaeten.add(v)
+                elif k == "perform_action":
+                    aktionen.add(v)
+                else:
+                    sammeln(v)
+        elif isinstance(knoten, list):
+            for v in knoten:
+                sammeln(v)
+
+    sammeln(inhalt)
+    assert entitaeten and aktionen
+    fehlend = [e for e in entitaeten if hass.states.get(e) is None]
+    assert not fehlend, fehlend
+    for aktion in aktionen:
+        domain, service = aktion.split(".")
+        assert hass.services.has_service(domain, service), aktion
+    if datei == "lichtstimmung-dashboard.yaml":
+        assert set(LAMPEN_IDS) <= entitaeten  # alle Lampen auf dem Dashboard
