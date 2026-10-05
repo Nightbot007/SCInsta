@@ -13,34 +13,35 @@ JINJA = REPO / "homeassistant" / "custom_templates" / "lichtstimmung.jinja"
 JINJA_BUCH = REPO / "homeassistant" / "custom_templates" / "lichtstimmung_buch.jinja"
 PACKAGE = REPO / "homeassistant" / "packages" / "lichtstimmung.yaml"
 
-# Deine Lampen (siehe lichtstimmung.jinja), simuliert als Farblampen.
+# Deine Lampen (siehe lichtstimmung.jinja) mit den Farbmodi aus deinem Home Assistant.
+# Der Name ergibt die Entity-ID (z. B. „H61F5 2“ -> light.h61f5_2).
 LAMPEN = [
-    {"name": "Hue Play Kommode", "modi": ["hs", "color_temp"]},
-    {"name": "TV Backlight", "modi": ["hs", "color_temp"]},
-    {"name": "Kommode Unterbeleuchtung", "modi": ["hs", "color_temp"]},
-    {"name": "Regal rechts unten", "modi": ["hs", "color_temp"]},
-    {"name": "Regal rechts oben", "modi": ["hs", "color_temp"]},
-    {"name": "Govee Floor Lamp", "modi": ["hs", "color_temp"]},
-    {"name": "Hue Play Treppenregal", "modi": ["hs", "color_temp"]},
-    {"name": "Hue Regal rechts", "modi": ["hs", "color_temp"]},
-    {"name": "Hue Regal links", "modi": ["hs", "color_temp"]},
+    {"name": "Hue Play 3", "modi": ["xy", "color_temp"]},
+    {"name": "3 HDMI 2.1 Fancy Sync Box", "modi": ["hs", "color_temp"]},
+    {"name": "Synced Fancyleds", "modi": ["hs", "color_temp"]},
+    {"name": "H61F5 2", "modi": ["rgb", "color_temp"]},
+    {"name": "H61F5", "modi": ["rgb", "color_temp"]},
+    {"name": "H6079", "modi": ["rgb", "color_temp"]},
+    {"name": "Hue Play 4", "modi": ["xy", "color_temp"]},
+    {"name": "Hue Go 2", "modi": ["xy", "color_temp"]},
+    {"name": "Hue Go 1", "modi": ["xy", "color_temp"]},
 ]
 LAMPEN_IDS = [
-    "light.hue_play_kommode",
-    "light.tv_backlight",
-    "light.kommode_unterbeleuchtung",
-    "light.regal_rechts_unten",
-    "light.regal_rechts_oben",
-    "light.govee_floor_lamp",
-    "light.hue_play_treppenregal",
-    "light.hue_regal_rechts",
-    "light.hue_regal_links",
+    "light.hue_play_3",
+    "light.3_hdmi_2_1_fancy_sync_box",
+    "light.synced_fancyleds",
+    "light.h61f5_2",
+    "light.h61f5",
+    "light.h6079",
+    "light.hue_play_4",
+    "light.hue_go_2",
+    "light.hue_go_1",
 ]
 BLITZ_LAMPEN = {
-    "light.hue_play_kommode",
-    "light.hue_play_treppenregal",
-    "light.hue_regal_rechts",
-    "light.hue_regal_links",
+    "light.hue_play_3",
+    "light.hue_play_4",
+    "light.hue_go_2",
+    "light.hue_go_1",
 }
 
 

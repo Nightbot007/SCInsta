@@ -359,7 +359,7 @@ script:
             domain: light
       wert:
         name: Wert
-        description: "z. B. {'an': true, 'hs': [30, 80], 'hell': 50} – hell in %, alternativ bri 1–255"
+        description: "z. B. {'an': true, 'hs': [30, 80], 'hell': 50} – Farbe als hs, xy oder rgb; hell in %, alternativ bri 1–255"
         selector:
           object:
       uebergang:
@@ -390,6 +390,24 @@ script:
                   entity_id: "{{ lampe }}"
                 data:
                   hs_color: "{{ wert.hs }}"
+                  brightness: "{{ helligkeit }}"
+                  transition: "{{ t }}"
+          - conditions: "{{ wert.xy is defined }}"
+            sequence:
+              - action: light.turn_on
+                target:
+                  entity_id: "{{ lampe }}"
+                data:
+                  xy_color: "{{ wert.xy }}"
+                  brightness: "{{ helligkeit }}"
+                  transition: "{{ t }}"
+          - conditions: "{{ wert.rgb is defined }}"
+            sequence:
+              - action: light.turn_on
+                target:
+                  entity_id: "{{ lampe }}"
+                data:
+                  rgb_color: "{{ wert.rgb }}"
                   brightness: "{{ helligkeit }}"
                   transition: "{{ t }}"
           - conditions: "{{ wert.kelvin is defined }}"

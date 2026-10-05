@@ -62,7 +62,7 @@ Kurzfassung:
 
 1. Hue (Integration „Philips Hue“), Govee („Govee lights local“) und FancyLEDs
    (über Smart Life → Integration „Tuya“) in Home Assistant einbinden.
-2. Lampen auf die Entity-IDs aus `lichtstimmung.jinja` umbenennen.
+2. Entity-IDs prüfen – deine sind in `lichtstimmung.jinja` schon eingetragen.
 3. In `configuration.yaml`: `homeassistant: packages: !include_dir_named packages`
 4. `lichtstimmung.yaml` → `/config/packages/`,
    `lichtstimmung.jinja` + `lichtstimmung_buch.jinja` → `/config/custom_templates/`
@@ -77,17 +77,19 @@ Farben einer Kombination durch den Raum:
 
 | # | Lampe | Marke | Entity-ID | Typ |
 |---|---|---|---|---|
-| 1 | Hue Play auf der Kommode | Philips Hue | `light.hue_play_kommode` | play |
-| 2 | TV-Backlight | FancyLEDs | `light.tv_backlight` | tv |
-| 3 | Kommode, Unterbeleuchtung | FancyLEDs | `light.kommode_unterbeleuchtung` | unterbau |
-| 4 | IKEA-Regal rechts vom TV, unten | Govee | `light.regal_rechts_unten` | unterbau |
-| 5 | IKEA-Regal rechts vom TV, oben | Govee | `light.regal_rechts_oben` | regal |
-| 6 | Floor Lamp Pro am Fenster | Govee | `light.govee_floor_lamp` | steh |
-| 7 | Hue Play im Treppenregal | Philips Hue | `light.hue_play_treppenregal` | play |
-| 8 | Hue unten am Regal überm Bett, rechts | Philips Hue | `light.hue_regal_rechts` | regal |
-| 9 | Hue unten am Regal überm Bett, links | Philips Hue | `light.hue_regal_links` | regal |
+| 1 | Hue Play auf der Kommode | Philips Hue | `light.hue_play_3` | play |
+| 2 | TV-Backlight (Sync Box) | FancyLEDs | `light.3_hdmi_2_1_fancy_sync_box` | tv |
+| 3 | Kommode, Unterbeleuchtung | FancyLEDs | `light.synced_fancyleds` | unterbau |
+| 4 | IKEA-Regal rechts vom TV, unten (M1 Pro) | Govee | `light.h61f5_2` | unterbau |
+| 5 | IKEA-Regal rechts vom TV, oben (M1 Pro) | Govee | `light.h61f5` | regal |
+| 6 | Floor Lamp Pro am Fenster | Govee | `light.h6079` | steh |
+| 7 | Hue Play im Treppenregal | Philips Hue | `light.hue_play_4` | play |
+| 8 | Hue Go unten am Regal überm Bett, rechts | Philips Hue | `light.hue_go_2` | regal |
+| 9 | Hue Go unten am Regal überm Bett, links | Philips Hue | `light.hue_go_1` | regal |
 
-Über den Typ legt jeder Modus die Helligkeit fest. Ein Beispiel: Bei
+Favoriten speichern jede Farbe im Format der Lampe (xy bei Hue, rgb bei
+Govee, hs bei Tuya) und kommen deshalb exakt so zurück, wie sie gespeichert
+wurden. Über den Typ legt jeder Modus die Helligkeit fest. Ein Beispiel: Bei
 Cyberpunk leuchten TV-Backlight und Unterbau kräftig, bei Ruhig ist alles
 gedämpft. Gewitter-Blitze laufen nur über die vier Hue-Lampen.
 

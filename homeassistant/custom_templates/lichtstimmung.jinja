@@ -16,19 +16,21 @@
   Lampen bekommen benachbarte Farben der Kombination – so entsteht ein
   harmonischer Verlauf durch den Raum.
 
-  Dein Zimmer, im Uhrzeigersinn ab der Tür:
-    1  Hue Play auf der Kommode (TV-Wand, links)        Philips Hue
-    2  TV-Backlight                                     FancyLEDs
-    3  Kommode, Unterbeleuchtung                        FancyLEDs
-    4  IKEA-Regal rechts vom TV, unten                  Govee
-    5  IKEA-Regal rechts vom TV, oben                   Govee
-    6  Floor Lamp Pro am Fenster                        Govee
-    7  Hue Play im Treppenregal                         Philips Hue
-    8  Hue unten am Regal überm Bett, rechts            Philips Hue
-    9  Hue unten am Regal überm Bett, links             Philips Hue
+  Dein Zimmer, im Uhrzeigersinn ab der Tür (Name in Home Assistant):
+    1  Hue Play auf der Kommode (TV-Wand, links)   Hue plane 1                Hue
+    2  TV-Backlight                                3 HDMI 2.1 Fancy Sync Box  FancyLEDs
+    3  Kommode, Unterbeleuchtung                   Synced Fancyleds           FancyLEDs
+    4  IKEA-Regal rechts vom TV, unten             M1 Pro - Unten             Govee
+    5  IKEA-Regal rechts vom TV, oben              M1 Pro - Oben              Govee
+    6  Floor Lamp Pro am Fenster                   Floor Lamp Pro             Govee
+    7  Hue Play im Treppenregal                    Hue plane 2                Hue
+    8  Hue unten am Regal überm Bett, rechts       Hue Table 2 (Hue Go)       Hue
+    9  Hue unten am Regal überm Bett, links        Hue Table 1 (Hue Go)       Hue
+  Stehen „Hue plane 1/2“ oder „Hue Table 1/2“ andersherum, einfach die
+  beiden Zeilen unten tauschen.
 
-  id     Entity-ID in Home Assistant. Am einfachsten benennst du die Lampen
-         in Home Assistant genau so um (siehe docs/installation.md).
+  id     Entity-ID in Home Assistant (Entwicklerwerkzeuge → Template, siehe
+         docs/raum-layout.md).
   typ    steuert die Helligkeit je Modus (siehe 'hell' bei den Modi):
          play = Hue Play, tv = TV-Backlight, unterbau = indirektes Licht
          unter Möbeln, regal = Regalbeleuchtung, steh = Stehlampe.
@@ -40,15 +42,15 @@
   erkennt Home Assistant selbst – das muss hier nicht eingetragen werden.
 ------------------------------------------------------------------------- -#}
 {%- set LAMPEN = [
-  {'id': 'light.hue_play_kommode',          'typ': 'play',     'blitz': true},
-  {'id': 'light.tv_backlight',              'typ': 'tv',       'blitz': false},
-  {'id': 'light.kommode_unterbeleuchtung',  'typ': 'unterbau', 'blitz': false},
-  {'id': 'light.regal_rechts_unten',        'typ': 'unterbau', 'blitz': false},
-  {'id': 'light.regal_rechts_oben',         'typ': 'regal',    'blitz': false},
-  {'id': 'light.govee_floor_lamp',          'typ': 'steh',     'blitz': false},
-  {'id': 'light.hue_play_treppenregal',     'typ': 'play',     'blitz': true},
-  {'id': 'light.hue_regal_rechts',          'typ': 'regal',    'blitz': true},
-  {'id': 'light.hue_regal_links',           'typ': 'regal',    'blitz': true},
+  {'id': 'light.hue_play_3',                  'typ': 'play',     'blitz': true},
+  {'id': 'light.3_hdmi_2_1_fancy_sync_box',   'typ': 'tv',       'blitz': false},
+  {'id': 'light.synced_fancyleds',            'typ': 'unterbau', 'blitz': false},
+  {'id': 'light.h61f5_2',                     'typ': 'unterbau', 'blitz': false},
+  {'id': 'light.h61f5',                       'typ': 'regal',    'blitz': false},
+  {'id': 'light.h6079',                       'typ': 'steh',     'blitz': false},
+  {'id': 'light.hue_play_4',                  'typ': 'play',     'blitz': true},
+  {'id': 'light.hue_go_2',                    'typ': 'regal',    'blitz': true},
+  {'id': 'light.hue_go_1',                    'typ': 'regal',    'blitz': true},
 ] -%}
 
 {#- -------------------------------------------------------------------------
@@ -338,7 +340,8 @@
 {{- {'lampen': ns.out, 'quelle': ns.quelle} | to_json -}}
 {%- endmacro -%}
 
-{#- Aktueller Zustand aller Lampen wie zuweisung(), Helligkeit aber exakt als 'bri' (1–255) -#}
+{#- Aktueller Zustand aller Lampen wie zuweisung(), aber exakt: Farbe als 'xy'/'rgb'/'hs'
+    (je nach Lampe), Helligkeit als 'bri' (1–255) -#}
 {%- macro momentaufnahme() -%}
 {%- set ns = namespace(out={}) -%}
 {%- for l in LAMPEN -%}
@@ -346,8 +349,15 @@
     {%- set bri = [state_attr(l.id, 'brightness') | int(255), 1] | max -%}
     {%- set cm = state_attr(l.id, 'color_mode') -%}
     {%- set hs = state_attr(l.id, 'hs_color') -%}
+    {%- set xy = state_attr(l.id, 'xy_color') -%}
+    {%- set rgb = state_attr(l.id, 'rgb_color') -%}
     {%- set k = state_attr(l.id, 'color_temp_kelvin') -%}
-    {%- if cm in FARBMODI and hs -%}
+    {#- im eigenen Farbformat der Lampe speichern – so kommt die Farbe exakt zurück -#}
+    {%- if cm == 'xy' and xy -%}
+      {%- set w = {'an': true, 'xy': [xy[0], xy[1]], 'bri': bri} -%}
+    {%- elif cm == 'rgb' and rgb -%}
+      {%- set w = {'an': true, 'rgb': [rgb[0], rgb[1], rgb[2]], 'bri': bri} -%}
+    {%- elif cm in FARBMODI and hs -%}
       {%- set w = {'an': true, 'hs': [hs[0] | round(1), hs[1] | round(1)], 'bri': bri} -%}
     {%- elif cm == 'color_temp' and k -%}
       {%- set w = {'an': true, 'kelvin': k | int, 'bri': bri} -%}

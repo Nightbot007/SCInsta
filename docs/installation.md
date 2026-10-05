@@ -1,7 +1,10 @@
 # Installation in Home Assistant
 
 Schritt für Schritt für dein Zimmer: 4× Philips Hue, 3× Govee, 2× FancyLEDs.
-Dauer etwa 30–45 Minuten. Voraussetzung: Home Assistant ab Version 2024.10.
+Voraussetzung: Home Assistant ab Version 2024.10.
+
+Deine Lampen sind schon alle in Home Assistant – Schritt 1 kannst du
+überspringen und bei Schritt 3 anfangen.
 
 ## 1. Lampen in Home Assistant einbinden
 
@@ -44,28 +47,25 @@ Home Assistant.
    eingeben → den angezeigten QR-Code mit der Smart-Life-App scannen
    (Plus oben rechts → Scannen) → bestätigen.
 
-## 2. Lampen umbenennen
+## 2. Lampen-IDs
 
-Die Lichtstimmung erwartet diese Entity-IDs. Am einfachsten benennst du die
-Lampen in Home Assistant so um – dann musst du keine Datei anpassen und kannst
-spätere Updates einfach überschreiben.
+Deine Lampen sind mit ihren echten Entity-IDs schon in
+`custom_templates/lichtstimmung.jinja` eingetragen – umbenennen ist nicht nötig:
 
-| Lampe | Entity-ID |
-|---|---|
-| Hue Play auf der Kommode | `light.hue_play_kommode` |
-| TV-Backlight (FancyLEDs) | `light.tv_backlight` |
-| Kommode, Unterbeleuchtung (FancyLEDs) | `light.kommode_unterbeleuchtung` |
-| IKEA-Regal rechts vom TV, unten (Govee) | `light.regal_rechts_unten` |
-| IKEA-Regal rechts vom TV, oben (Govee) | `light.regal_rechts_oben` |
-| Floor Lamp Pro am Fenster (Govee) | `light.govee_floor_lamp` |
-| Hue Play im Treppenregal | `light.hue_play_treppenregal` |
-| Hue unten am Regal überm Bett, rechts | `light.hue_regal_rechts` |
-| Hue unten am Regal überm Bett, links | `light.hue_regal_links` |
+| Lampe | Name in Home Assistant | Entity-ID |
+|---|---|---|
+| Hue Play auf der Kommode | Hue plane 1 | `light.hue_play_3` |
+| TV-Backlight | 3 HDMI 2.1 Fancy Sync Box | `light.3_hdmi_2_1_fancy_sync_box` |
+| Kommode, Unterbeleuchtung | Synced Fancyleds | `light.synced_fancyleds` |
+| IKEA-Regal rechts vom TV, unten | M1 Pro - Unten | `light.h61f5_2` |
+| IKEA-Regal rechts vom TV, oben | M1 Pro - Oben | `light.h61f5` |
+| Floor Lamp Pro am Fenster | Floor Lamp Pro | `light.h6079` |
+| Hue Play im Treppenregal | Hue plane 2 | `light.hue_play_4` |
+| Hue unten am Regal überm Bett, rechts | Hue Table 2 (Hue Go) | `light.hue_go_2` |
+| Hue unten am Regal überm Bett, links | Hue Table 1 (Hue Go) | `light.hue_go_1` |
 
-So geht's: **Einstellungen → Geräte & Dienste → Reiter „Entitäten“** → Lampe
-suchen → anklicken → **Zahnrad** → Feld **„Entitäts-ID“** ändern →
-**Aktualisieren**. Welche Lampe welche ist, siehst du, wenn du sie im selben
-Dialog ein- und ausschaltest.
+Stehen „Hue plane 1/2“ oder „Hue Table 1/2“ andersherum, ist das nur für den
+Farbverlauf wichtig: in `lichtstimmung.jinja` die beiden Zeilen tauschen.
 
 ## 3. Packages einschalten
 

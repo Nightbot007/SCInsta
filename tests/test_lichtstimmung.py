@@ -88,6 +88,16 @@ def quelle(hass):
     return zustand(hass).attributes["quelle"]
 
 
+def gleiche_farbe(ist, soll, farbton_tol=3.0, saettigung_tol=6.0):
+    """Hue (xy) und Govee (rgb) bekommen umgerechnete Farben. Home Assistants Umrechnung
+    hs -> xy -> hs weicht gemessen um bis zu 2,7° Farbton und 5,1 % Sättigung ab.
+    Bei fast weißem Licht ist der Farbton unscharf und bekommt mehr Spielraum."""
+    dh = abs(ist[0] - soll[0]) % 360
+    if min(ist[1], soll[1]) < 20:
+        farbton_tol = 25
+    return min(dh, 360 - dh) <= farbton_tol and abs(ist[1] - soll[1]) <= saettigung_tol
+
+
 def folgt_dem_plan(hass):
     """Jede eingeschaltete Lampe leuchtet genau so, wie im Zustand gespeichert."""
     plan = zustand(hass).attributes["zuweisung"]
@@ -95,7 +105,8 @@ def folgt_dem_plan(hass):
         w = plan[l]
         assert ist_an(hass, l) == w["an"], l
         if w.get("hs"):
-            assert hass.states.get(l).attributes["hs_color"] == pytest.approx(w["hs"], abs=0.5), l
+            ist = hass.states.get(l).attributes["hs_color"]
+            assert gleiche_farbe(ist, w["hs"]), (l, ist, w["hs"])
             assert round(hass.states.get(l).attributes["brightness"] / 2.55) == w["hell"], l
         if w.get("kelvin"):
             assert hass.states.get(l).attributes["color_temp_kelvin"] == w["kelvin"], l
@@ -132,8 +143,9 @@ async def test_einrichtung_und_konfig_check(lichtstimmung):
         "{% from 'lichtstimmung.jinja' import pruefen %}{{ pruefen() }}", hass
     ).async_render()
     assert "❌" not in bericht and "⚠️" not in bericht, bericht
-    assert "light.hue_play_kommode [play, blitzt]: off · Farbe" in bericht
-    assert "light.govee_floor_lamp [steh]: off · Farbe" in bericht
+    assert "light.hue_play_3 [play, blitzt]: off · Farbe" in bericht
+    assert "light.h6079 [steh]: off · Farbe" in bericht
+    assert "light.3_hdmi_2_1_fancy_sync_box [tv]: off · Farbe" in bericht
     assert "Sonnenuntergang (inaktiv)" in bericht
     assert f"Farbwörterbuch: {len(BUCH)} Kombinationen als Licht geeignet" in bericht
     assert "- Cozy: 26 aus dem Buch, 1 eigene" in bericht
@@ -151,7 +163,7 @@ async def test_taste_schaltet_alles_an_mit_passenden_unterschiedlichen_farben(li
     assert len(set(farben)) >= 2, farben  # nie alle gleich
     # Cozy: nur warme Töne (Rot bis Gelb) oder warmweiß
     assert all(im_bereich(h, 340, 50, toleranz=4) or s <= 20 for h, s in farben), farben
-    assert 1 <= round(hass.states.get("light.govee_floor_lamp").attributes["brightness"] / 2.55) <= 60
+    assert 1 <= round(hass.states.get("light.h6079").attributes["brightness"] / 2.55) <= 60
     assert flag(hass) == "off"
 
 
@@ -193,16 +205,16 @@ async def test_einzelne_lampen_aendern_den_modus_nie(lichtstimmung):
     await taste(hass)
     farben = {l: farbton(hass, l) for l in FARBLAMPEN}
 
-    await licht(hass, "off", "light.govee_floor_lamp")
-    await licht(hass, "on", "light.govee_floor_lamp")
+    await licht(hass, "off", "light.h6079")
+    await licht(hass, "on", "light.h6079")
     assert modus(hass) == "Cozy"
-    assert farbton(hass, "light.govee_floor_lamp") == farben["light.govee_floor_lamp"]
+    assert farbton(hass, "light.h6079") == farben["light.h6079"]
 
     # Alle Lampen einzeln aus – das ist NICHT die Taste.
     for l in LAMPEN_IDS:
         await licht(hass, "off", l)
     assert flag(hass) == "off"
-    await licht(hass, "on", "light.tv_backlight")
+    await licht(hass, "on", "light.3_hdmi_2_1_fancy_sync_box")
     assert modus(hass) == "Cozy"
 
     # Taste schaltet alles wieder in derselben Stimmung und Verteilung ein.
@@ -214,9 +226,7 @@ async def test_einzelne_lampen_aendern_den_modus_nie(lichtstimmung):
         await licht(hass, "off", l)
     await taste(hass)
     assert modus(hass) == "Cyberpunk"
-    plan = zustand(hass).attributes["zuweisung"]
-    for l in FARBLAMPEN:
-        assert farbton(hass, l) == pytest.approx(plan[l]["hs"][0])
+    folgt_dem_plan(hass)
 
 
 async def test_nach_taste_aus_startet_auch_eine_einzelne_lampe_den_neuen_modus(lichtstimmung):
@@ -224,20 +234,24 @@ async def test_nach_taste_aus_startet_auch_eine_einzelne_lampe_den_neuen_modus(l
     await taste(hass)  # Cozy
     await taste(hass)  # alles aus
 
-    await licht(hass, "on", "light.govee_floor_lamp")
+    await licht(hass, "on", "light.h6079")
     assert modus(hass) == "Cyberpunk"
     assert flag(hass) == "off"
-    assert hass.states.get("light.govee_floor_lamp").attributes["hs_color"] == pytest.approx(
-        zustand(hass).attributes["zuweisung"]["light.govee_floor_lamp"]["hs"], abs=0.5
+    assert gleiche_farbe(
+        hass.states.get("light.h6079").attributes["hs_color"],
+        zustand(hass).attributes["zuweisung"]["light.h6079"]["hs"],
     )
-    assert not ist_an(hass, "light.tv_backlight")
-    assert set(zustand(hass).attributes["offen"]) == set(LAMPEN_IDS) - {"light.govee_floor_lamp"}
+    assert not ist_an(hass, "light.3_hdmi_2_1_fancy_sync_box")
+    assert set(zustand(hass).attributes["offen"]) == set(LAMPEN_IDS) - {"light.h6079"}
 
     # Eine weitere Lampe bekommt beim Einschalten ihre Cyberpunk-Farbe.
-    await licht(hass, "on", "light.tv_backlight")
+    await licht(hass, "on", "light.3_hdmi_2_1_fancy_sync_box")
     plan = zustand(hass).attributes["zuweisung"]
-    assert farbton(hass, "light.tv_backlight") == pytest.approx(plan["light.tv_backlight"]["hs"][0])
-    assert "light.tv_backlight" not in zustand(hass).attributes["offen"]
+    assert gleiche_farbe(
+        hass.states.get("light.3_hdmi_2_1_fancy_sync_box").attributes["hs_color"],
+        plan["light.3_hdmi_2_1_fancy_sync_box"]["hs"],
+    )
+    assert "light.3_hdmi_2_1_fancy_sync_box" not in zustand(hass).attributes["offen"]
     assert modus(hass) == "Cyberpunk"
 
 
@@ -278,7 +292,7 @@ async def test_favorit_speichern_abrufen_und_loeschen(lichtstimmung):
     hass = lichtstimmung
     await taste(hass)  # Cozy
     herkunft = quelle(hass)
-    await licht(hass, "on", "light.govee_floor_lamp", hs_color=[5, 100], brightness=200)
+    await licht(hass, "on", "light.h6079", hs_color=[5, 100], brightness=200)
     await hass.services.async_call(
         "input_text",
         "set_value",
@@ -291,20 +305,25 @@ async def test_favorit_speichern_abrufen_und_loeschen(lichtstimmung):
     assert fav.state == "1"
     assert fav.attributes["favoriten"]["Abendrot"]["basis"] == "Cozy"
     assert fav.attributes["favoriten"]["Abendrot"]["quelle"] == herkunft
+    lampen = fav.attributes["favoriten"]["Abendrot"]["lampen"]
+    assert lampen["light.hue_play_3"].keys() == {"an", "xy", "bri"}  # Hue
+    assert lampen["light.h6079"].keys() == {"an", "rgb", "bri"}  # Govee
+    assert lampen["light.synced_fancyleds"].keys() == {"an", "hs", "bri"}  # Tuya
     assert "★ Abendrot" in auswahl(hass).attributes["options"]
     assert auswahl(hass).state == "★ Abendrot"
     assert modus(hass) == "★ Abendrot"
     assert hass.states.get("input_text.lichtstimmung_favorit_name").state == ""
     gespeichert = {l: hass.states.get(l).attributes["hs_color"] for l in FARBLAMPEN}
-    assert gespeichert["light.govee_floor_lamp"] == (5, 100)
+    assert gleiche_farbe(gespeichert["light.h6079"], (5, 100))
 
     await waehle(hass, "Cyberpunk")
-    assert farbton(hass, "light.govee_floor_lamp") != 5
+    assert not gleiche_farbe(hass.states.get("light.h6079").attributes["hs_color"], (5, 100))
 
     await waehle(hass, "★ Abendrot")
     for l in FARBLAMPEN:
-        assert hass.states.get(l).attributes["hs_color"] == pytest.approx(gespeichert[l], abs=0.1)
-    assert hass.states.get("light.govee_floor_lamp").attributes["brightness"] == 200
+        # exakt – Favoriten speichern die Farbe im Format der Lampe (xy/rgb/hs)
+        assert hass.states.get(l).attributes["hs_color"] == gespeichert[l], l
+    assert hass.states.get("light.h6079").attributes["brightness"] == 200
     assert quelle(hass) == herkunft
 
     # Aktiven Favoriten löschen: Auswahl springt auf den ersten Modus, Lampen bleiben.
@@ -450,7 +469,7 @@ async def test_lampe_nur_weiss_nur_helligkeit_und_fehlende_lampe(hass, tmp_path)
     ]
 
     def anpassen(jinja):
-        zeile = "  {'id': 'light.hue_regal_links',           'typ': 'regal',    'blitz': true},\n"
+        zeile = "  {'id': 'light.hue_go_1',                    'typ': 'regal',    'blitz': true},\n"
         assert zeile in jinja
         return jinja.replace(
             zeile,
@@ -540,12 +559,12 @@ async def test_buch_kombination_wird_originalgetreu_verteilt(hass, tmp_path):
     await taste(hass)
     assert quelle(hass) == f"Buch Nr. {nr}"
     folgt_dem_plan(hass)
-    for l, hell in (("light.hue_play_kommode", 55), ("light.govee_floor_lamp", 60), ("light.tv_backlight", 45)):
+    for l, hell in (("light.hue_play_3", 55), ("light.h6079", 60), ("light.3_hdmi_2_1_fancy_sync_box", 45)):
         h, s = hass.states.get(l).attributes["hs_color"]
         prozent = round(hass.states.get(l).attributes["brightness"] / 2.55)
         # passende Buchfarbe: Farbton ± Streuung, Helligkeit = Typ-Helligkeit × Faktor der Farbe
         assert any(
-            nah_an(h, [f["h"]], 4 + 1) and abs(s - f["s"]) <= 4 + 1 and prozent == max(round(hell * f["f"]), 1)
+            nah_an(h, [f["h"]], 4 + 3) and abs(s - f["s"]) <= 4 + 6 and prozent == max(round(hell * f["f"]), 1)
             for f in farben
         ), (l, h, s, prozent, farben)
     # Alle Farben der Kombination kommen vor (9 Lampen, 3 Farben).
@@ -569,7 +588,7 @@ async def test_eigene_palette(hass, tmp_path):
     assert quelle(hass) == "Eigene Palette 1"
     folgt_dem_plan(hass)
     assert all(nah_an(hs(hass, l)[0], [38, 30, 22], 5) for l in FARBLAMPEN)
-    assert round(hass.states.get("light.govee_floor_lamp").attributes["brightness"] / 2.55) == 60
+    assert round(hass.states.get("light.h6079").attributes["brightness"] / 2.55) == 60
 
 
 async def test_farbwoerterbuch_modus(lichtstimmung):
